@@ -45,7 +45,6 @@ func (e *Editor) SetHex(on bool) {
 	if e.Hwnd() == 0 {
 		return
 	}
-	procShowScrollBar.Call(uintptr(e.Hwnd()), uintptr(co.SBB_HORZ), boolArg(on || !e.wrap))
 	e.SetFont(e.lf, e.zoom)
 	e.reveal()
 	e.notify()

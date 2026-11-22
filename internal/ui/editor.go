@@ -249,7 +249,6 @@ func (e *Editor) SetWrap(wrap bool) {
 		return
 	}
 	e.xoff = 0
-	procShowScrollBar.Call(uintptr(e.Hwnd()), uintptr(co.SBB_HORZ), boolArg(!wrap || e.hex))
 	e.relayout()
 }
 
@@ -727,6 +726,12 @@ func (e *Editor) paint() {
 	}
 	selA, selB := e.Selection()
 	row, more := e.top, true
+	// Laying out rows that were not seen yet can find a wider one.
+	defer func(maxW int32) {
+		if e.maxW != maxW {
+			e.updateScrollBars()
+		}
+	}(e.maxW)
 	for y := int32(0); y < e.ch; y += e.lineH {
 		visible := y+e.lineH > ps.RcPaint.Top && y < ps.RcPaint.Bottom
 		if !more {
@@ -843,17 +848,25 @@ func (e *Editor) updateScrollBars() {
 		}
 	}
 	h.SetScrollInfo(co.SBB_VERT, &si, true)
-	if e.hex {
-		e.maxW = int32(hexCells(e.hexDigits())-1) * e.avgW
-	} else if e.wrap {
-		return
-	}
+
+	// The horizontal bar is always there, and disabled when there is
+	// nothing to scroll: with word wrap, or when everything fits.
 	si = win.SCROLLINFO{}
 	si.SetCbSize()
 	si.Mask = co.SIF_RANGE | co.SIF_PAGE | co.SIF_POS | co.SIF_DISABLENOSCROLL
-	si.Max = e.maxW + 2*e.margin + e.avgW
-	si.Page = uint32(max(1, e.cw))
-	e.xoff = max(0, min(e.xoff, si.Max-e.cw+1))
+	width := e.maxW + 2*e.margin + e.avgW // with room for the caret after the text
+	switch {
+	case e.hex: // the rows are all as wide
+		e.maxW = int32(hexCells(e.hexDigits())) * e.avgW
+		width = e.maxW + 2*e.margin
+	case e.wrap:
+		width = 0
+	}
+	if width > e.cw {
+		si.Max = width - 1
+		si.Page = uint32(max(1, e.cw))
+	}
+	e.xoff = max(0, min(e.xoff, width-e.cw))
 	si.Pos = e.xoff
 	h.SetScrollInfo(co.SBB_HORZ, &si, true)
 }
