@@ -42,8 +42,7 @@ shows the same file as a hex editor does.
 
 Where it differs from Notepad on purpose: there is a binary mode (see below),
 undo has many levels (Ctrl+Y or Ctrl+Shift+Z is redo), a selected line break is
-shown, the menu bar has the colour of the status bar instead of white, and the
-Search with Bing and Send Feedback menu items are gone.
+shown, and the Search with Bing and Send Feedback menu items are gone.
 
 ## Binary mode
 
@@ -52,6 +51,8 @@ bytes with their address, the bytes in hex and the bytes as characters. View,
 Text Mode goes back, and Ctrl+B changes between the two. A window starts in
 text mode, unless it is started as `text4win /b file`. Huge files work the
 same way in both modes.
+
+![text4win in binary mode](screenshot-binary.png)
 
 - The caret is in the hex column or in the character column; Tab changes
   that, and so does a click. In the hex column you type hex digits, in the
