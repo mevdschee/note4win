@@ -284,6 +284,17 @@ func (a *App) events(opts Options) {
 		}
 	})
 	on.WmEraseBkgnd(func(_ ui.WmEraseBkgnd) int { return 1 })
+	on.WmPaint(func() { // the line between the menu bar and the text
+		var ps win.PAINTSTRUCT
+		hdc, err := a.wnd.Hwnd().BeginPaint(&ps)
+		if err != nil {
+			return
+		}
+		rc, _ := a.wnd.Hwnd().GetClientRect()
+		rc.Bottom = a.menuLine()
+		fillRect(uintptr(hdc), &rc, colors.barLine)
+		a.wnd.Hwnd().EndPaint(&ps)
+	})
 	on.WmSetFocus(func(_ ui.WmSetFocus) { a.ed.Hwnd().SetFocus() })
 	on.WmClose(func() {
 		if a.busy {
@@ -428,14 +439,25 @@ func (a *App) start(opts Options) {
 
 // ---- window ----
 
+// menuLine is the height of the line between the menu bar and the text in
+// dark mode, at the top of the client area. In light mode Windows draws the
+// lines under the menu bar.
+func (a *App) menuLine() int32 {
+	if ownBar {
+		return 1
+	}
+	return 0
+}
+
 func (a *App) layout() {
 	rc, _ := a.wnd.Hwnd().GetClientRect()
-	h := rc.Bottom
+	top := a.menuLine()
+	h := rc.Bottom - top
 	if a.cfg.StatusBar {
 		sr, _ := a.sb.Hwnd().GetWindowRect()
 		h -= sr.Bottom - sr.Top
 	}
-	a.ed.Hwnd().SetWindowPos(0, win.POINT{}, win.SIZE{Cx: rc.Right, Cy: max(0, h)}, co.SWP_NOZORDER|co.SWP_NOACTIVATE)
+	a.ed.Hwnd().SetWindowPos(0, win.POINT{Y: top}, win.SIZE{Cx: rc.Right, Cy: max(0, h)}, co.SWP_NOZORDER|co.SWP_NOACTIVATE)
 }
 
 // restoreWindow puts the window, which is still hidden, where it was, or a

@@ -212,6 +212,7 @@ func themeDialog(h win.HWND) {
 func (a *App) applyTheme() {
 	h := a.wnd.Hwnd()
 	themeFrame(h)
+	a.layout() // the line under the menu bar comes and goes with the mode
 	a.ed.SetColors(editorColors{bg: colors.window, fg: colors.text, selBg: colors.selection, selFg: colors.selectedText})
 	allowDark(a.ed.Hwnd())
 	if darkMode {
@@ -369,7 +370,8 @@ func (a *App) menuBarEvents() {
 		return 1
 	})
 	// The line between the menu bar and the text is not part of the bar
-	// and stays light in dark mode; paint a dark one over it.
+	// and stays light in dark mode; paint over it. The dark line is the
+	// first row of the client area, see App.menuLine.
 	for _, msg := range []co.WM{co.WM_NCPAINT, co.WM_NCACTIVATE} {
 		on.Wm(msg, func(p ui.Wm) uintptr {
 			h := a.wnd.Hwnd()
@@ -380,7 +382,7 @@ func (a *App) menuBarEvents() {
 				wr, _ := h.GetWindowRect()
 				line := win.RECT{Left: rc.Left - wr.Left, Right: rc.Right - wr.Left, Top: rc.Top - wr.Top - 1, Bottom: rc.Top - wr.Top}
 				if hdc, err := h.GetWindowDC(); err == nil {
-					fillRect(uintptr(hdc), &line, colors.barLine)
+					fillRect(uintptr(hdc), &line, colors.bar)
 					h.ReleaseDC(hdc)
 				}
 			}
