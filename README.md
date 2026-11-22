@@ -6,7 +6,8 @@ Notepad of Windows 10: the same menus, shortcuts, dialogs and status bar, one
 window per file and no tabs. The difference is under the hood. Notepad loads a
 file into a Windows edit control and gives up on large ones; text4win draws the
 text itself and leaves the file where it is, so a log of many gigabytes opens
-in seconds and scrolls, searches and edits like a small one.
+in seconds and scrolls, searches and edits like a small one. A binary mode
+shows the same file as a hex editor does.
 
 ![text4win](screenshot.png)
 
@@ -39,10 +40,10 @@ in seconds and scrolls, searches and edits like a small one.
 - Checks for a newer release on request (Help, Check for Updates) and installs
   it. Nothing is checked automatically.
 
-Where it differs from Notepad on purpose: there is a binary mode (see below), undo has many levels (Ctrl+Y or
-Ctrl+Shift+Z is redo), a selected line break is shown, the menu bar has the
-colour of the status bar instead of white, and the Search with Bing and Send
-Feedback menu items are gone.
+Where it differs from Notepad on purpose: there is a binary mode (see below),
+undo has many levels (Ctrl+Y or Ctrl+Shift+Z is redo), a selected line break is
+shown, the menu bar has the colour of the status bar instead of white, and the
+Search with Bing and Send Feedback menu items are gone.
 
 ## Binary mode
 
