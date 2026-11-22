@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI definition, built with wixl (msitools) by release.sh:
+  wixl -a x64 -D Version=x.y.z -D FileVersion=x.y.z.b -D ExePath=... -D IconPath=... -o out.msi text4win.wxs
+  It installs per user, without admin rights, into %LOCALAPPDATA%\Programs\text4win.
+  The UpgradeCode must never change, so new versions replace old ones.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="text4win" Language="1033" Version="$(var.Version)"
+           Manufacturer="Maurits van der Schee" UpgradeCode="6F2B9C1E-8D47-4A53-9E0B-3C1D5A7F4E82">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser"
+             Description="text4win $(var.Version)" Comments="Notepad for Windows that opens huge files"/>
+    <Media Id="1" Cabinet="text4win.cab" EmbedCab="yes"/>
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of text4win is already installed."/>
+
+    <Icon Id="text4win.ico" SourceFile="$(var.IconPath)"/>
+    <Property Id="ARPPRODUCTICON" Value="text4win.ico"/>
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/mevdschee/text4win"/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLDIR" Name="text4win">
+            <!-- Per-user components need a registry key path, not the file. -->
+            <Component Id="MainExecutable" Guid="*" Win64="yes">
+              <!-- The version must be set: an unversioned file never replaces
+                   the versioned exe of the old install during an upgrade, and
+                   removing the old version then deletes it. -->
+              <File Id="text4win.exe" Name="text4win.exe" Source="$(var.ExePath)"
+                    DefaultVersion="$(var.FileVersion)"/>
+              <RemoveFolder Id="RemoveInstallDir" On="uninstall"/>
+              <RegistryValue Root="HKCU" Key="Software\text4win" Name="exe"
+                             Type="integer" Value="1" KeyPath="yes"/>
+            </Component>
+            <!-- "Open with" in Explorer offers text4win for any file, and
+                 "text4win" works in the Run box and the address bar. Nothing
+                 is taken over: .txt files keep the program they had. -->
+            <Component Id="OpenWith" Guid="*" Win64="yes">
+              <RegistryValue Root="HKCU" Key="Software\text4win" Name="openwith"
+                             Type="integer" Value="1" KeyPath="yes"/>
+              <RegistryValue Root="HKCU" Key="Software\Classes\Applications\text4win.exe"
+                             Name="FriendlyAppName" Type="string" Value="text4win"/>
+              <RegistryValue Root="HKCU" Key="Software\Classes\Applications\text4win.exe\shell\open\command"
+                             Type="string" Value="&quot;[INSTALLDIR]text4win.exe&quot; &quot;%1&quot;"/>
+              <RegistryValue Root="HKCU" Key="Software\Classes\Applications\text4win.exe\SupportedTypes"
+                             Name=".txt" Type="string" Value=""/>
+              <RegistryValue Root="HKCU" Key="Software\Classes\Applications\text4win.exe\SupportedTypes"
+                             Name=".log" Type="string" Value=""/>
+              <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\text4win.exe"
+                             Type="string" Value="[INSTALLDIR]text4win.exe"/>
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Component Id="StartMenuShortcut" Guid="*">
+          <Shortcut Id="text4winShortcut" Name="text4win" Description="Notepad that opens huge files"
+                    Target="[INSTALLDIR]text4win.exe" WorkingDirectory="INSTALLDIR"/>
+          <RegistryValue Root="HKCU" Key="Software\text4win" Name="shortcut"
+                         Type="integer" Value="1" KeyPath="yes"/>
+        </Component>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Main" Level="1">
+      <ComponentRef Id="MainExecutable"/>
+      <ComponentRef Id="OpenWith"/>
+      <ComponentRef Id="StartMenuShortcut"/>
+    </Feature>
+  </Product>
+</Wix>
