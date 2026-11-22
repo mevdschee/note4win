@@ -36,7 +36,8 @@ func main() {
 
 // parseArgs reads the command line like Notepad: an optional file, "/p" to
 // print it, and "/a" and "/w" (ANSI and Unicode), which are accepted and
-// ignored because the encoding is detected.
+// ignored because the encoding is detected. "/b" is not Notepad's: it starts
+// in binary mode.
 func parseArgs(args []string) ui.Options {
 	var opts ui.Options
 	var words []string
@@ -45,6 +46,9 @@ func parseArgs(args []string) ui.Options {
 			switch strings.ToLower(arg[1:]) {
 			case "p":
 				opts.Print = true
+				continue
+			case "b":
+				opts.Binary = true
 				continue
 			case "a", "w":
 				continue

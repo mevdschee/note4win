@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/mevdschee/text4win/internal/doc"
 )
@@ -66,4 +68,38 @@ func runes(u []uint16) []rune {
 		out[i] = rune(c)
 	}
 	return out
+}
+
+func TestHexRow(t *testing.T) {
+	got := string(utf16.Decode(hexRow(nil, 8, 0x1F0, []byte("Hi\x00\xff"))))
+	want := "000001F0  48 69 00 FF" + strings.Repeat(" ", 36) + "  Hi.." + strings.Repeat(" ", 12)
+	if got != want {
+		t.Errorf("hexRow = %q, want %q", got, want)
+	}
+	if n := hexAddrDigits(1 << 32); n != 10 {
+		t.Errorf("hexAddrDigits(4 GB) = %d, want 10", n)
+	}
+	if n := hexAddrDigits(1<<32 - 1); n != 8 {
+		t.Errorf("hexAddrDigits(4 GB - 1) = %d, want 8", n)
+	}
+}
+
+func TestParseHex(t *testing.T) {
+	for in, want := range map[string]string{
+		"4D 5A":      "MZ",
+		"4d5a\r\n00": "MZ\x00",
+		" 41 ":       "A",
+	} {
+		if got, ok := parseHex([]byte(in)); !ok || string(got) != want {
+			t.Errorf("parseHex(%q) = %q, %v", in, got, ok)
+		}
+	}
+	for _, in := range []string{"", "  ", "4", "4D 5", "4 D", "xy", "0x41"} {
+		if got, ok := parseHex([]byte(in)); ok {
+			t.Errorf("parseHex(%q) = %q, want no bytes", in, got)
+		}
+	}
+	if got := formatHex([]byte("MZ\x00")); got != "4D 5A 00" {
+		t.Errorf("formatHex = %q", got)
+	}
 }

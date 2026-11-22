@@ -24,6 +24,7 @@ type findState struct {
 	what, with            string
 	matchCase, wrapAround bool
 	down                  bool
+	hex                   bool // binary mode: the text is hex bytes, like "4D 5A"
 
 	dlg      win.HWND
 	replace  bool // the dialog is the Replace dialog
@@ -46,6 +47,8 @@ const (
 	idDown
 	idReplace
 	idReplaceAll
+	idHex
+	idText
 	idFindNext = 1 // IDOK: the Enter key
 	idCancel   = 2 // IDCANCEL: the Escape key
 )
@@ -87,12 +90,16 @@ type wndClassEx struct {
 // showFind opens the Find or the Replace dialog, or brings it forward.
 func (a *App) showFind(replace bool) {
 	f := &a.find
-	if sel := a.ed.SelectedText(1000); sel != "" && !strings.ContainsAny(sel, "\r\n") {
+	if a.binary { // what the column of the caret holds
+		f.hex = a.ed.HexColumn()
+	}
+	if sel := a.ed.FindText(); sel != "" {
 		f.what = sel
 	}
 	if f.dlg != 0 {
 		if f.replace == replace {
 			setWindowText(a.findCtl(idFindWhat), f.what)
+			a.showFindMode()
 			procSetForegroundWindow.Call(uintptr(f.dlg))
 			a.focusFindWhat()
 			return
@@ -158,6 +165,8 @@ func (a *App) showFind(replace bool) {
 		a.addCtl("EDIT", f.what, edit|group, clientEdge, 54, 7, 114, 12, idFindWhat)
 		a.addCtl("STATIC", "Re&place with:", 0, 0, 4, 26, 48, 8, 0)
 		a.addCtl("EDIT", f.with, edit|group, clientEdge, 54, 24, 114, 12, idReplaceWith)
+		a.addCtl("BUTTON", "He&x bytes", radio|group|tab, 0, 5, 44, 50, 12, idHex)
+		a.addCtl("BUTTON", "&Text", radio, 0, 58, 44, 40, 12, idText)
 		a.addCtl("BUTTON", "Match &case", check|group, 0, 5, 62, 59, 12, idMatchCase)
 		a.addCtl("BUTTON", "Wrap ar&ound", check, 0, 5, 76, 65, 12, idWrapAround)
 		a.addCtl("BUTTON", "&Find Next", defPB|group, 0, 174, 4, 50, 14, idFindNext)
@@ -167,6 +176,8 @@ func (a *App) showFind(replace bool) {
 	} else {
 		a.addCtl("STATIC", "Fi&nd what:", 0, 0, 4, 8, 42, 8, 0)
 		a.addCtl("EDIT", f.what, edit|group, clientEdge, 47, 7, 128, 12, idFindWhat)
+		a.addCtl("BUTTON", "He&x bytes", radio|group|tab, 0, 4, 25, 50, 12, idHex)
+		a.addCtl("BUTTON", "&Text", radio, 0, 56, 25, 40, 12, idText)
 		a.addCtl("BUTTON", "Match &case", check|group, 0, 4, 42, 64, 12, idMatchCase)
 		a.addCtl("BUTTON", "Wrap ar&ound", check, 0, 4, 56, 64, 12, idWrapAround)
 		a.addCtl("BUTTON", "Direction", box|group, 0, 107, 26, 68, 28, 0)
@@ -179,9 +190,29 @@ func (a *App) showFind(replace bool) {
 	procCheckDlgButton.Call(hwnd, idMatchCase, boolArg(f.matchCase))
 	procCheckDlgButton.Call(hwnd, idWrapAround, boolArg(f.wrapAround))
 	a.enableFindButtons()
+	a.showFindMode()
 	themeDialog(f.dlg)
 	f.dlg.ShowWindow(co.SW_SHOW)
 	a.focusFindWhat()
+}
+
+// showFindMode shows the choice between hex bytes and text, which only
+// the binary mode has, and sets it.
+func (a *App) showFindMode() {
+	f := &a.find
+	if f.dlg == 0 {
+		return
+	}
+	show, id := co.SW_HIDE, idText
+	if a.binary {
+		show = co.SW_SHOW
+	}
+	if f.hex {
+		id = idHex
+	}
+	a.findCtl(idHex).ShowWindow(show)
+	a.findCtl(idText).ShowWindow(show)
+	procCheckRadioButton.Call(uintptr(f.dlg), idHex, idText, uintptr(id))
 }
 
 func (f *findState) dluX(v int32) int32 { return v * f.baseX / 4 }
@@ -226,6 +257,9 @@ func (a *App) readFind() {
 	}
 	f.what = windowText(a.findCtl(idFindWhat))
 	f.matchCase, f.wrapAround = checked(idMatchCase), checked(idWrapAround)
+	if a.binary {
+		f.hex = checked(idHex)
+	}
 	if f.replace {
 		f.with = windowText(a.findCtl(idReplaceWith))
 		f.down = true
@@ -341,9 +375,31 @@ func (a *App) findAgain(down bool) {
 	a.findNext(down)
 }
 
+// needle returns what is searched for, what replaces it and whether case
+// matters. With "Hex bytes" chosen in binary mode the text of the dialog
+// is hex digits: "4D 5A" stands for those two bytes. It says so and
+// returns false when the text is something else.
+func (a *App) needle(replacing bool) (what, with string, matchCase, ok bool) {
+	f := &a.find
+	if !a.binary || !f.hex {
+		return f.what, f.with, f.matchCase, true
+	}
+	w, ok := parseHex([]byte(f.what))
+	var r []byte
+	if ok && replacing && strings.TrimSpace(f.with) != "" {
+		r, ok = parseHex([]byte(f.with))
+	}
+	if !ok {
+		a.findOwner().MessageBox("Hex bytes are written as pairs of hex digits, like 4D 5A.\n\nChoose Text to look for the characters themselves.",
+			appName, co.MB_ICONINFORMATION)
+		return "", "", false, false
+	}
+	return string(w), string(r), true, true
+}
+
 // search looks for the next match from the selection, going around the end
 // of the document when that is set.
-func (a *App) search(down bool) (doc.Match, bool) {
+func (a *App) search(what string, matchCase, down bool) (doc.Match, bool) {
 	f := &a.find
 	d := a.ed.Doc()
 	selA, selB := a.ed.Selection()
@@ -353,19 +409,23 @@ func (a *App) search(down bool) (doc.Match, bool) {
 	if !down {
 		from = selA
 	}
-	m, ok := d.Find(f.what, from, down, f.matchCase)
+	m, ok := d.Find(what, from, down, matchCase)
 	if !ok && f.wrapAround {
 		from = 0
 		if !down {
 			from = d.Len()
 		}
-		m, ok = d.Find(f.what, from, down, f.matchCase)
+		m, ok = d.Find(what, from, down, matchCase)
 	}
 	return m, ok
 }
 
 func (a *App) findNext(down bool) bool {
-	m, ok := a.search(down)
+	what, _, matchCase, ok := a.needle(false)
+	if !ok {
+		return false
+	}
+	m, ok := a.search(what, matchCase, down)
 	if !ok {
 		a.notFound()
 		return false
@@ -381,11 +441,15 @@ func (a *App) replaceOne() {
 	if f.what == "" {
 		return
 	}
+	what, with, matchCase, ok := a.needle(true)
+	if !ok {
+		return
+	}
 	d := a.ed.Doc()
 	selA, selB := a.ed.Selection()
 	if selA != selB {
-		if m, ok := d.Find(f.what, selA, true, f.matchCase); ok && m.Off == selA && m.N == selB-selA {
-			a.ed.Insert([]byte(f.with), doc.Other)
+		if m, ok := d.Find(what, selA, true, matchCase); ok && m.Off == selA && m.N == selB-selA {
+			a.ed.Insert([]byte(with), doc.Other)
 		}
 	}
 	a.findNext(true)
@@ -397,11 +461,15 @@ func (a *App) replaceAll() {
 	if f.what == "" {
 		return
 	}
+	what, with, matchCase, ok := a.needle(true)
+	if !ok {
+		return
+	}
 	restore := waitCursor()
 	d := a.ed.Doc()
-	matches := d.FindAll(f.what, f.matchCase, nil)
+	matches := d.FindAll(what, matchCase, nil)
 	if len(matches) > 0 {
-		d.ReplaceAll(matches, []byte(f.with))
+		d.ReplaceAll(matches, []byte(with))
 	}
 	restore()
 	if len(matches) == 0 {
@@ -412,8 +480,13 @@ func (a *App) replaceAll() {
 	a.ed.Refresh(0)
 }
 
-// goTo shows the Go To Line dialog.
+// goTo shows the Go To Line dialog, which asks for an address in binary
+// mode: decimal, or hex after "0x".
 func (a *App) goTo() {
+	if a.binary {
+		a.goToOffset()
+		return
+	}
 	wnd := newModal(a.wnd, ui.OptsModal().Title("Go To Line").Size(ui.Dpi(250, 104)))
 	ui.NewStatic(wnd, ui.OptsStatic().Text("&Line number:").Position(ui.Dpi(12, 12)).Size(ui.Dpi(226, 18)))
 	line, _ := a.ed.LineCol()
@@ -449,6 +522,43 @@ func (a *App) goTo() {
 	if target > 0 {
 		a.ed.caretEOL = false
 		a.ed.moveTo(a.ed.Doc().LineStart(target-1), false)
+	}
+}
+
+func (a *App) goToOffset() {
+	wnd := newModal(a.wnd, ui.OptsModal().Title("Go To Address").Size(ui.Dpi(250, 104)))
+	ui.NewStatic(wnd, ui.OptsStatic().Text("&Address (hex after 0x):").Position(ui.Dpi(12, 12)).Size(ui.Dpi(226, 18)))
+	edit := ui.NewEdit(wnd, ui.OptsEdit().Text(fmt.Sprintf("0x%X", a.ed.Caret())).Position(ui.Dpi(12, 34)).
+		Width(ui.DpiX(226)).CtrlStyle(co.ES_AUTOHSCROLL))
+	ok := ui.NewButton(wnd, ui.OptsButton().Text("Go To").Position(ui.Dpi(70, 68)).Width(ui.DpiX(80)).
+		CtrlId(uint16(co.ID_OK)).CtrlStyle(co.BS_DEFPUSHBUTTON))
+	cancel := ui.NewButton(wnd, ui.OptsButton().Text("Cancel").Position(ui.Dpi(158, 68)).Width(ui.DpiX(80)).
+		CtrlId(uint16(co.ID_CANCEL)))
+	cancel.On().BnClicked(func() { closeModal(wnd) })
+	wnd.On().WmCreate(func(_ ui.WmCreate) int {
+		wnd.UiThread(func() {
+			edit.Focus()
+			edit.SetSelection(0, -1)
+		})
+		return 0
+	})
+	target := int64(-1)
+	ok.On().BnClicked(func() {
+		size := a.ed.Doc().Len()
+		n, err := strconv.ParseInt(strings.TrimSpace(edit.Text()), 0, 64)
+		if err != nil || n < 0 || n > size {
+			wnd.Hwnd().MessageBox("The address is beyond the end of the file", appName+" - Goto Address", co.MB_OK)
+			edit.SetText(fmt.Sprintf("0x%X", size))
+			edit.Focus()
+			edit.SetSelection(0, -1)
+			return
+		}
+		target = n
+		closeModal(wnd)
+	})
+	wnd.ShowModal()
+	if target >= 0 {
+		a.ed.moveTo(target, false)
 	}
 }
 

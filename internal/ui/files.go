@@ -92,9 +92,11 @@ func (a *App) open(path string) { a.openThen(path, nil) }
 // read at once. Large ones are mapped and indexed in the background, with
 // the progress in the status bar; closing the window cancels that.
 func (a *App) openThen(path string, then func()) {
-	a.load(path, false, func(d *doc.Doc, f *doc.File, enc doc.Encoding) {
+	a.load(path, a.binary, false, func(d *doc.Doc, f *doc.File, enc doc.Encoding) {
 		a.setDoc(d, f, path, enc)
-		a.logFile()
+		if !a.binary {
+			a.logFile()
+		}
 		if then != nil {
 			then()
 		}
@@ -102,9 +104,14 @@ func (a *App) openThen(path string, then func()) {
 }
 
 // load opens a file and hands the document to done, on the UI thread.
-// Nothing is changed when it fails. With wait set a large file is not
-// loaded in the background: done is called before load returns.
-func (a *App) load(path string, wait bool, done func(*doc.Doc, *doc.File, doc.Encoding)) {
+// Nothing is changed when it fails. With binary set the document is the
+// bytes of the file as they are. With wait set a large file is not loaded
+// in the background: done is called before load returns.
+func (a *App) load(path string, binary, wait bool, done func(*doc.Doc, *doc.File, doc.Encoding)) {
+	read := doc.Load
+	if binary {
+		read = doc.LoadRaw
+	}
 	st, err := os.Stat(path)
 	if err == nil && st.IsDir() {
 		err = &os.PathError{Op: "open", Path: path, Err: windows.ERROR_ACCESS_DENIED}
@@ -121,7 +128,7 @@ func (a *App) load(path string, wait bool, done func(*doc.Doc, *doc.File, doc.En
 			a.fileError("open", path, err)
 			return
 		}
-		d, enc := doc.Load(f.Data, !f.Mapped, nil, nil)
+		d, enc := read(f.Data, !f.Mapped, nil, nil)
 		restore()
 		done(d, f, enc)
 		return
@@ -140,7 +147,7 @@ func (a *App) load(path string, wait bool, done func(*doc.Doc, *doc.File, doc.En
 		var enc doc.Encoding
 		f, err := doc.Open(path)
 		if err == nil {
-			d, enc = doc.Load(f.Data, false, func(n int64) {
+			d, enc = read(f.Data, false, func(n int64) {
 				for {
 					old := a.loaded.Load()
 					if n <= old || a.loaded.CompareAndSwap(old, n) {
@@ -200,13 +207,16 @@ func (a *App) saveAs() bool {
 	name := a.path
 	if name == "" {
 		name = "*.txt"
+		if a.binary {
+			name = "*.*"
+		}
 	}
-	path, enc, ok := saveFileDialog(a.wnd.Hwnd(), name, a.enc)
+	path, enc, ok := saveFileDialog(a.wnd.Hwnd(), name, a.enc, a.binary)
 	a.ed.Hwnd().SetFocus()
 	if !ok {
 		return false
 	}
-	if enc == doc.ANSI && !a.ed.Doc().FitsANSI() {
+	if !a.binary && enc == doc.ANSI && !a.ed.Doc().FitsANSI() {
 		ret, _ := a.wnd.Hwnd().MessageBox(path+"\n"+
 			"This file contains characters in Unicode format which will be lost if you save this file as an ANSI encoded text file. "+
 			"To keep the Unicode information, click Cancel below and then select one of the Unicode options from the Encoding drop down list. Continue?",
@@ -226,14 +236,21 @@ func (a *App) saveAs() bool {
 // that is not edited still lives in the file. It goes to a temporary file
 // next to the target, which then replaces the target; after that the
 // document is mapped again from the new file, with an empty undo list.
+//
+// In binary mode the document is the bytes of the file, which are written
+// as they are; enc is then only what the text mode would read them as.
 func (a *App) write(path string, enc doc.Encoding) bool {
 	d := a.ed.Doc()
+	as := enc
+	if a.binary {
+		as = doc.UTF8
+	}
 	restore := waitCursor()
 	defer restore()
 	if a.file == nil || !a.file.Mapped {
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		if err == nil {
-			err = d.WriteTo(f, enc)
+			err = d.WriteTo(f, as)
 			if cerr := f.Close(); err == nil {
 				err = cerr
 			}
@@ -252,7 +269,7 @@ func (a *App) write(path string, enc doc.Encoding) bool {
 	os.Remove(tmp) // left behind by a save that failed
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 	if err == nil {
-		err = d.WriteTo(f, enc)
+		err = d.WriteTo(f, as)
 		if cerr := f.Close(); err == nil {
 			err = cerr
 		}
@@ -266,13 +283,13 @@ func (a *App) write(path string, enc doc.Encoding) bool {
 	}
 	// From here the old document is gone: its text is in the temporary file.
 	top, anchor, caret, eol := a.ed.top, a.ed.anchor, a.ed.caret, a.ed.eol
-	sameText := enc == a.enc || (enc != doc.ANSI && a.enc != doc.ANSI)
+	sameText := a.binary || enc == a.enc || (enc != doc.ANSI && a.enc != doc.ANSI)
 	a.setDoc(doc.New(nil, nil, nil), nil, a.path, a.enc)
 	if err := replaceFile(tmp, path); err != nil {
 		a.fileError("save", path, err)
 		path = tmp // the text is still there
 	}
-	a.load(path, true, func(nd *doc.Doc, nf *doc.File, _ doc.Encoding) {
+	a.load(path, a.binary, true, func(nd *doc.Doc, nf *doc.File, _ doc.Encoding) {
 		a.setDoc(nd, nf, path, enc)
 		a.ed.SetEOL(eol)
 		if sameText { // the same bytes, so the same offsets

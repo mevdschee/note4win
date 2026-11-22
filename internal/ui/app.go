@@ -63,6 +63,9 @@ const (
 	cmdHelp
 	cmdUpdate
 	cmdAbout
+	cmdTextMode
+	cmdBinaryMode
+	cmdToggleMode
 	cmdLast
 )
 
@@ -78,7 +81,10 @@ type App struct {
 
 	path string // empty for a new document
 	enc  doc.Encoding
-	file *doc.File // the opened file, while the document uses its memory
+	// binary is the binary mode: the document is the bytes of the file as
+	// they are, also when enc says that the text mode would convert them.
+	binary bool
+	file   *doc.File // the opened file, while the document uses its memory
 
 	find   findState
 	busy   bool // a file is loading
@@ -95,8 +101,9 @@ type App struct {
 
 // Options are the command line arguments.
 type Options struct {
-	Path  string // file to open
-	Print bool   // print it and exit
+	Path   string // file to open
+	Print  bool   // print it and exit
+	Binary bool   // start in binary mode
 }
 
 // Run shows the main window and returns the exit code.
@@ -205,6 +212,9 @@ func buildMenu() win.HMENU {
 		cmdZoomOut, "Zoom &Out\tCtrl+Minus",
 		cmdZoomReset, "&Restore Default Zoom\tCtrl+0")
 	popup("&View",
+		cmdTextMode, "&Text Mode\tCtrl+B",
+		cmdBinaryMode, "&Binary Mode\tCtrl+B",
+		nil,
 		zoom, "&Zoom",
 		cmdStatusBar, "&Status Bar")
 	popup("&Help",
@@ -234,6 +244,7 @@ func accelerators() win.HACCEL {
 		win.ACCEL{FVirt: co.ACCELF_VIRTKEY | co.ACCELF_SHIFT, Key: co.VK_F3, Cmd: cmdFindPrev},
 		win.ACCEL{FVirt: ctrl, Key: co.VK('H'), Cmd: cmdReplace},
 		win.ACCEL{FVirt: ctrl, Key: co.VK('G'), Cmd: cmdGoTo},
+		win.ACCEL{FVirt: ctrl, Key: co.VK('B'), Cmd: cmdToggleMode},
 		win.ACCEL{FVirt: co.ACCELF_VIRTKEY, Key: co.VK_F5, Cmd: cmdTimeDate},
 		win.ACCEL{FVirt: ctrl, Key: co.VK_OEM_PLUS, Cmd: cmdZoomIn},
 		win.ACCEL{FVirt: ctrlShift, Key: co.VK_OEM_PLUS, Cmd: cmdZoomIn},
@@ -325,35 +336,38 @@ func (a *App) events(opts Options) {
 	a.menuBarEvents()
 
 	commands := map[uint16]func(){
-		cmdNew:       a.newFile,
-		cmdNewWindow: a.newWindow,
-		cmdOpen:      a.openDialog,
-		cmdSave:      func() { a.save() },
-		cmdSaveAs:    func() { a.saveAs() },
-		cmdPageSetup: a.pageSetup,
-		cmdPrint:     func() { a.printDialog() },
-		cmdExit:      func() { a.wnd.Hwnd().PostMessage(co.WM_CLOSE, 0, 0) },
-		cmdUndo:      a.ed.Undo,
-		cmdCut:       a.ed.Cut,
-		cmdCopy:      func() { a.ed.Copy() },
-		cmdPaste:     a.ed.Paste,
-		cmdDelete:    func() { a.ed.Insert(nil, doc.Other) },
-		cmdFind:      func() { a.showFind(false) },
-		cmdFindNext:  func() { a.findAgain(true) },
-		cmdFindPrev:  func() { a.findAgain(false) },
-		cmdReplace:   func() { a.showFind(true) },
-		cmdGoTo:      a.goTo,
-		cmdSelectAll: a.ed.SelectAll,
-		cmdTimeDate:  a.timeDate,
-		cmdWordWrap:  a.toggleWrap,
-		cmdFont:      a.chooseFont,
-		cmdZoomIn:    func() { a.zoom(a.ed.Zoom() + 10) },
-		cmdZoomOut:   func() { a.zoom(a.ed.Zoom() - 10) },
-		cmdZoomReset: func() { a.zoom(100) },
-		cmdStatusBar: a.toggleStatusBar,
-		cmdHelp:      func() { shellOpen(a.wnd.Hwnd(), repoURL+"#readme") },
-		cmdUpdate:    a.checkForUpdates,
-		cmdAbout:     func() { showAbout(a) },
+		cmdNew:        a.newFile,
+		cmdNewWindow:  a.newWindow,
+		cmdOpen:       a.openDialog,
+		cmdSave:       func() { a.save() },
+		cmdSaveAs:     func() { a.saveAs() },
+		cmdPageSetup:  a.pageSetup,
+		cmdPrint:      func() { a.printDialog() },
+		cmdExit:       func() { a.wnd.Hwnd().PostMessage(co.WM_CLOSE, 0, 0) },
+		cmdUndo:       a.ed.Undo,
+		cmdCut:        a.ed.Cut,
+		cmdCopy:       func() { a.ed.Copy() },
+		cmdPaste:      a.ed.Paste,
+		cmdDelete:     a.ed.Delete,
+		cmdFind:       func() { a.showFind(false) },
+		cmdFindNext:   func() { a.findAgain(true) },
+		cmdFindPrev:   func() { a.findAgain(false) },
+		cmdReplace:    func() { a.showFind(true) },
+		cmdGoTo:       a.goTo,
+		cmdSelectAll:  a.ed.SelectAll,
+		cmdTimeDate:   a.timeDate,
+		cmdWordWrap:   a.toggleWrap,
+		cmdFont:       a.chooseFont,
+		cmdZoomIn:     func() { a.zoom(a.ed.Zoom() + 10) },
+		cmdZoomOut:    func() { a.zoom(a.ed.Zoom() - 10) },
+		cmdZoomReset:  func() { a.zoom(100) },
+		cmdStatusBar:  a.toggleStatusBar,
+		cmdHelp:       func() { shellOpen(a.wnd.Hwnd(), repoURL+"#readme") },
+		cmdUpdate:     a.checkForUpdates,
+		cmdAbout:      func() { showAbout(a) },
+		cmdTextMode:   func() { a.setBinary(false) },
+		cmdBinaryMode: func() { a.setBinary(true) },
+		cmdToggleMode: func() { a.setBinary(!a.binary) },
 	}
 	for id, fn := range commands {
 		on.WmCommandAccelMenu(id, func() {
@@ -370,6 +384,9 @@ const wmStart = co.WM(wmUser + 100)
 
 // start handles the command line.
 func (a *App) start(opts Options) {
+	if opts.Binary {
+		a.setBinary(true)
+	}
 	if opts.Path == "" {
 		return
 	}
@@ -497,6 +514,19 @@ func (a *App) update() {
 	if a.busy {
 		return
 	}
+	if a.binary {
+		mode := " INS"
+		if a.ed.Overwrite() {
+			mode = " OVR"
+		}
+		size := a.ed.Doc().Len()
+		a.setStatus(
+			fmt.Sprintf("  Cursor: %0*X", hexAddrDigits(size), a.ed.Caret()),
+			fmt.Sprintf(" %d%%", a.ed.Zoom()),
+			fmt.Sprintf(" %d bytes", size),
+			mode)
+		return
+	}
 	line, col := a.ed.LineCol()
 	a.setStatus(
 		fmt.Sprintf("  Ln %d, Col %d", line, col),
@@ -520,7 +550,11 @@ func (a *App) updateMenu(m win.HMENU) {
 	d := a.ed.Doc()
 	sel := a.ed.HasSelection()
 	enableItems(m, d.CanUndo(), cmdUndo)
-	enableItems(m, sel, cmdCut, cmdCopy, cmdDelete)
+	enableItems(m, sel, cmdCopy)
+	enableItems(m, a.ed.CanDelete(), cmdCut, cmdDelete)
+	enableItems(m, !a.binary, cmdTimeDate, cmdWordWrap)
+	m.CheckMenuItemByCmd(!a.binary, cmdTextMode)
+	m.CheckMenuItemByCmd(a.binary, cmdBinaryMode)
 	enableItems(m, CanPaste(), cmdPaste)
 	enableItems(m, d.Len() > 0, cmdFind, cmdFindNext, cmdFindPrev)
 	enableItems(m, a.ed.Zoom() < maxZoom, cmdZoomIn)
@@ -577,6 +611,10 @@ func (a *App) newWindow() {
 
 // timeDate inserts the time and the date, in the short formats of Windows.
 func (a *App) timeDate() {
+	if a.binary {
+		beep()
+		return
+	}
 	a.ed.Insert([]byte(localeFormat(procGetTimeFormatW, 0x0002)+" "+localeFormat(procGetDateFormatW, 0x0001)), doc.Other) // TIME_NOSECONDS, DATE_SHORTDATE
 }
 
@@ -590,8 +628,49 @@ func localeFormat(proc *windows.LazyProc, flags uintptr) string {
 }
 
 func (a *App) toggleWrap() {
+	if a.binary {
+		beep()
+		return
+	}
 	a.ed.SetWrap(!a.ed.Wrap())
 	a.ed.reveal()
+}
+
+// setBinary changes between the text mode and the binary mode. A UTF-8
+// document has the bytes of its file, so only the view changes and the
+// edits and the undo list stay. In another encoding the text is a
+// conversion of the file, which is then read again in the other mode; the
+// caret goes to the same place in it.
+func (a *App) setBinary(binary bool) {
+	if binary == a.binary {
+		return
+	}
+	if a.enc == doc.UTF8 || a.path == "" {
+		a.binary = binary
+		a.ed.SetHex(binary)
+		a.showFindMode()
+		a.update()
+		return
+	}
+	if !a.confirmSave() {
+		return
+	}
+	path := a.path
+	a.load(path, binary, false, func(d *doc.Doc, f *doc.File, enc doc.Encoding) {
+		restore := waitCursor()
+		old, caret := a.ed.Doc(), a.ed.Caret()
+		if binary {
+			caret = d.BOMSize() + old.RawOffset(caret, a.enc)
+		} else {
+			caret = old.TextOffset(caret, enc)
+		}
+		restore()
+		a.binary = binary
+		a.ed.SetHex(binary)
+		a.setDoc(d, f, path, enc)
+		a.ed.GoTo(caret)
+		a.showFindMode()
+	})
 }
 
 func (a *App) toggleStatusBar() {

@@ -368,3 +368,87 @@ func BenchmarkIndex(b *testing.B) {
 		New(text, nil, nil)
 	}
 }
+
+// TestOvertype types over text a hex digit at a time, as the binary mode
+// does, and takes it back in one step.
+func TestOvertype(t *testing.T) {
+	d := New([]byte("abc\r\ndef"), nil, nil)
+	m := &model{text: []byte("abc\r\ndef")}
+	put := func(off, del int64, b byte) {
+		d.Replace(off, del, []byte{b}, Overtype)
+		m.text = append(m.text[:off:off], append([]byte{b}, m.text[off+del:]...)...)
+		check(t, d, m, fmt.Sprintf("put %q at %d", b, off))
+	}
+	put(3, 1, 'X') // first digit of the CR
+	put(3, 1, 'Y') // second digit
+	put(4, 1, 'Z') // the LF
+	put(4, 1, '\r')
+	put(5, 0, 'i') // inserted
+	put(5, 1, '\n')
+	if len(d.undo) != 1 {
+		t.Fatalf("%d undo steps, want 1", len(d.undo))
+	}
+	d.Undo()
+	m.text = []byte("abc\r\ndef")
+	check(t, d, m, "undo")
+	d.Redo()
+	m.text = []byte("abcY\r\ndef")
+	check(t, d, m, "redo")
+	d.Undo()
+	d.BreakUndo()
+	d.Replace(8, 0, []byte{'!'}, Overtype) // at the end
+	d.Replace(0, 1, []byte{'A'}, Overtype) // somewhere else: a new step
+	if len(d.undo) != 2 {
+		t.Fatalf("%d undo steps, want 2", len(d.undo))
+	}
+	d.Undo()
+	d.Undo()
+	m.text = []byte("abc\r\ndef")
+	check(t, d, m, "undo both")
+}
+
+func TestLoadRaw(t *testing.T) {
+	raw := []byte{0xFF, 0xFE, 'a', 0, '\r', 0, '\n', 0}
+	d, enc := LoadRaw(raw, true, nil, nil)
+	if enc != UTF16LE || !bytes.Equal(d.Bytes(0, d.Len()), raw) {
+		t.Fatalf("LoadRaw = %q, %v", d.Bytes(0, d.Len()), enc)
+	}
+	var out bytes.Buffer
+	if err := d.WriteTo(&out, UTF8); err != nil || !bytes.Equal(out.Bytes(), raw) {
+		t.Fatalf("WriteTo = %q, %v", out.Bytes(), err)
+	}
+}
+
+// TestOffsets maps places in a text to the bytes of its file and back.
+func TestOffsets(t *testing.T) {
+	for _, enc := range Encodings {
+		text := "Grüße €, 😀 and more\r\nline 2\n"
+		if enc == ANSI { // has no emoji
+			text = "Grüße €, and more\r\nline 2\n"
+		}
+		d := New([]byte(text), nil, nil)
+		var buf bytes.Buffer
+		if err := d.WriteTo(&buf, enc); err != nil {
+			t.Fatal(err)
+		}
+		raw, det := LoadRaw(buf.Bytes(), true, nil, nil)
+		if det != enc {
+			t.Fatalf("%v: detected as %v", enc, det)
+		}
+		for off := range text + "." { // the start of every character, and the end
+			at := raw.BOMSize() + d.RawOffset(int64(off), enc)
+			if back := raw.TextOffset(at, enc); back != int64(off) {
+				t.Errorf("%v: text %d is byte %d, which is text %d", enc, off, at, back)
+			}
+			if off == len(text) && at != raw.Len() {
+				t.Errorf("%v: the end is byte %d of %d", enc, at, raw.Len())
+			}
+		}
+	}
+	raw := New([]byte("\xff\xfea\x00=\xd8\x00\xdeb\x00"), nil, nil) // a, U+1F600, b
+	for off, want := range []int64{0, 0, 0, 0, 1, 1, 1, 1, 5, 5, 6} {
+		if got := raw.TextOffset(int64(off), UTF16LE); got != want {
+			t.Errorf("TextOffset(%d) = %d, want %d", off, got, want)
+		}
+	}
+}

@@ -85,7 +85,8 @@ const (
 )
 
 // saveFileDialog shows the Save As dialog, with Notepad's Encoding list.
-func saveFileDialog(owner win.HWND, current string, enc doc.Encoding) (string, doc.Encoding, bool) {
+// In binary mode there is no encoding to choose and no ".txt" to add.
+func saveFileDialog(owner win.HWND, current string, enc doc.Encoding, binary bool) (string, doc.Encoding, bool) {
 	rel := win.NewOleReleaser()
 	defer rel.Release()
 	var dlg *winsh.IFileSaveDialog
@@ -95,15 +96,25 @@ func saveFileDialog(owner win.HWND, current string, enc doc.Encoding) (string, d
 	opts, _ := dlg.GetOptions()
 	dlg.SetOptions(opts | cosh.FOS_FORCEFILESYSTEM | cosh.FOS_OVERWRITEPROMPT)
 	dlg.SetFileTypes(fileTypes)
-	dlg.SetDefaultExtension("txt")
-	dlg.SetFileName(filepath.Base(current))
-	if ext := strings.ToLower(filepath.Ext(current)); ext != ".txt" && !strings.HasPrefix(current, "*") {
+	if !binary {
+		dlg.SetDefaultExtension("txt")
+	}
+	if !strings.HasPrefix(current, "*") {
+		dlg.SetFileName(filepath.Base(current))
+	} else if !binary {
+		dlg.SetFileName(current)
+	}
+	if ext := strings.ToLower(filepath.Ext(current)); binary || ext != ".txt" && !strings.HasPrefix(current, "*") {
 		dlg.SetFileTypeIndex(2)
 	}
 	startIn(rel, &dlg.IFileDialog, current)
 
 	var custom uintptr
 	if int32(comCall(dlg.Ppvt(), 0, uintptr(unsafe.Pointer(&iidFileDialogCustomize)), uintptr(unsafe.Pointer(&custom)))) < 0 {
+		custom = 0
+	}
+	if custom != 0 && binary {
+		comCall(custom, vtRelease)
 		custom = 0
 	}
 	if custom != 0 {

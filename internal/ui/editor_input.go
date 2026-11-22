@@ -34,6 +34,10 @@ func (e *Editor) inputEvents() {
 		if e.locked {
 			return
 		}
+		if e.hex {
+			e.hexButtonDown(p)
+			return
+		}
 		pt := p.Pos()
 		off, eol := e.hit(pt.X, pt.Y)
 		e.Hwnd().SetCapture()
@@ -46,6 +50,13 @@ func (e *Editor) inputEvents() {
 			return
 		}
 		pt := p.Pos()
+		if e.hex { // the byte
+			off, chars, _, _ := e.hexAt(pt.X, pt.Y, -1)
+			e.hexChars = chars
+			e.anchor = off
+			e.moveTo(off+1, true)
+			return
+		}
 		off, _ := e.hit(pt.X, pt.Y)
 		a, b := e.wordAt(off)
 		e.anchor = a
@@ -129,9 +140,9 @@ func (e *Editor) moveTo(off int64, extend bool) {
 	if !extend {
 		e.anchor = off
 	}
-	e.wantX = -1
+	e.wantX, e.nibble = -1, 0
 	e.d.BreakUndo()
-	if had || e.HasSelection() {
+	if had || e.HasSelection() || e.hex {
 		e.Hwnd().InvalidateRect(nil, false)
 	}
 	e.reveal()
@@ -274,6 +285,10 @@ func (e *Editor) wordAt(off int64) (int64, int64) {
 // ---- keyboard ----
 
 func (e *Editor) onKey(vk co.VK) {
+	if e.hex {
+		e.hexKey(vk)
+		return
+	}
 	ctrl, shift := keyDown(co.VK_CONTROL), keyDown(co.VK_SHIFT)
 	if keyDown(co.VK_MENU) {
 		return
@@ -425,6 +440,10 @@ func (e *Editor) movePage(dir int, extend bool) {
 }
 
 func (e *Editor) onChar(r rune) {
+	if e.hex {
+		e.hexChar(r)
+		return
+	}
 	ctrl, alt := keyDown(co.VK_CONTROL), keyDown(co.VK_MENU)
 	switch {
 	case r == '\r':
@@ -472,7 +491,7 @@ func (e *Editor) replace(a, b int64, text []byte, kind doc.Kind) {
 	e.d.Replace(a, b-a, text, kind)
 	e.edited(a, b-a, int64(len(text)))
 	e.anchor = a + int64(len(text))
-	e.caret = e.anchor
+	e.caret, e.nibble = e.anchor, 0
 	e.finishEdit()
 }
 
@@ -512,7 +531,7 @@ func (e *Editor) Refresh(off int64) {
 	e.maxTop = -1
 	e.col = colCache{}
 	e.anchor = max(0, min(off, e.d.Len()))
-	e.caret = e.anchor
+	e.caret, e.nibble = e.anchor, 0
 	e.finishEdit()
 }
 
@@ -532,16 +551,32 @@ func (e *Editor) Redo() {
 
 // SelectAll selects the whole text, without scrolling.
 func (e *Editor) SelectAll() {
-	e.anchor, e.caret, e.caretEOL, e.wantX = 0, e.d.Len(), false, -1
+	e.anchor, e.caret, e.caretEOL, e.wantX, e.nibble = 0, e.d.Len(), false, -1, 0
 	e.d.BreakUndo()
 	e.updateCaret()
 	e.Hwnd().InvalidateRect(nil, false)
 	e.notify()
 }
 
+// CanDelete reports whether the selection can be taken out: not while
+// the binary mode overwrites, which keeps every byte at its place.
+func (e *Editor) CanDelete() bool { return e.HasSelection() && !(e.hex && e.ovr) }
+
+// Delete takes out the selection.
+func (e *Editor) Delete() {
+	switch {
+	case e.hex && e.ovr:
+		beep()
+	case e.HasSelection():
+		e.Insert(nil, doc.Other)
+	}
+}
+
 // Cut moves the selection to the clipboard.
 func (e *Editor) Cut() {
-	if e.HasSelection() && e.Copy() {
+	if e.hex && e.ovr {
+		beep()
+	} else if e.HasSelection() && e.Copy() {
 		e.Insert(nil, doc.Other)
 	}
 }
@@ -556,9 +591,14 @@ func (e *Editor) Copy() bool {
 		return false
 	}
 	err := errors.New("The selection is too large for the clipboard.")
-	if b-a <= maxClipboard {
+	asHex := e.hex && !e.hexChars
+	if b-a <= maxClipboard && (!asHex || b-a <= maxHexCopy) {
 		restore := waitCursor()
-		err = e.copyRange(a, b)
+		if asHex {
+			err = e.copyHex(a, b)
+		} else {
+			err = e.copyRange(a, b)
+		}
 		restore()
 	}
 	if err != nil {
@@ -605,6 +645,12 @@ func (e *Editor) copyRange(a, b int64) error {
 	}
 	out[i] = 0
 	procGlobalUnlock.Call(h)
+	return e.setClipboard(h)
+}
+
+// setClipboard puts global memory with UTF-16 text on the clipboard, or
+// frees it.
+func (e *Editor) setClipboard(h uintptr) error {
 	if r, _, _ := procOpenClipboard.Call(uintptr(e.Hwnd())); r == 0 {
 		procGlobalFree.Call(h)
 		return errors.New("The clipboard is in use by another program.")
@@ -665,6 +711,10 @@ func clipboardText(owner win.HWND) ([]byte, bool) {
 func (e *Editor) Paste() {
 	text, ok := clipboardText(e.Hwnd())
 	if !ok || len(text) == 0 {
+		return
+	}
+	if e.hex {
+		e.hexPaste(text)
 		return
 	}
 	e.Insert(convertEOL(text, e.eol), doc.Other)

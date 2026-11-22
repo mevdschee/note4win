@@ -162,6 +162,22 @@ func Load(raw []byte, complete bool, progress func(done int64), stop *atomic.Boo
 	return d, enc
 }
 
+// LoadRaw makes a document of the bytes of a file as they are, for the
+// binary mode. The encoding is the one that Load would read the file with;
+// only for UTF8 does Load give a document with the same bytes.
+func LoadRaw(raw []byte, complete bool, progress func(done int64), stop *atomic.Bool) (*Doc, Encoding) {
+	sample := raw
+	if !complete && len(sample) > sampleSize {
+		sample = sample[:sampleSize]
+	}
+	enc, _ := Detect(sample, len(sample) == len(raw))
+	d := New(raw, progress, stop)
+	if stop != nil && stop.Load() {
+		return nil, enc
+	}
+	return d, enc
+}
+
 func decodeUTF16(b []byte, bigEndian bool) []byte {
 	var order binary.ByteOrder = binary.LittleEndian
 	if bigEndian {
@@ -297,4 +313,111 @@ func (d *Doc) FitsANSI() bool {
 		return nil
 	})
 	return fits
+}
+
+// The text mode and the binary mode show the same file, as text and as its
+// bytes. The functions below tell where a place in the one is in the other,
+// by converting what comes before it in one pass.
+
+// BOMSize is the size of the byte order mark that a document with the bytes
+// of a file starts with.
+func (d *Doc) BOMSize() int64 {
+	_, bom := Detect(d.Bytes(0, 3), false)
+	return int64(bom)
+}
+
+// RawOffset returns how many bytes the text before off takes in a file
+// with an encoding, not counting a byte order mark.
+func (d *Doc) RawOffset(off int64, enc Encoding) int64 {
+	off = max(0, min(off, d.Len()))
+	if enc == UTF8 || enc == UTF8BOM {
+		return off
+	}
+	var n int64
+	buf := make([]byte, 1<<20)
+	for pos := int64(0); pos < off; {
+		c := buf[:d.ReadAt(buf[:min(int64(len(buf)), off-pos)], pos)]
+		if len(c) == 0 {
+			break
+		}
+		if cut := splitRunes(c); cut > 0 && pos+int64(len(c)) < off {
+			c = c[:cut]
+		}
+		pos += int64(len(c))
+		if enc == ANSI {
+			out, _ := ansiEncode(c)
+			n += int64(len(out))
+			continue
+		}
+		for len(c) > 0 {
+			r, size := utf8.DecodeRune(c)
+			c = c[size:]
+			n += 2
+			if r >= 0x10000 {
+				n += 2
+			}
+		}
+	}
+	return n
+}
+
+// TextOffset returns, for a document with the bytes of a file in an
+// encoding, where the byte at off is in the text that Load makes of it.
+func (d *Doc) TextOffset(off int64, enc Encoding) int64 {
+	var bom int64
+	if enc != UTF8 && enc != ANSI {
+		bom = d.BOMSize()
+	}
+	off = max(bom, min(off, d.Len()))
+	if enc == UTF8 || enc == UTF8BOM {
+		return off - bom
+	}
+	if enc != ANSI {
+		off -= (off - bom) & 1
+	}
+	var order binary.ByteOrder = binary.LittleEndian
+	if enc == UTF16BE {
+		order = binary.BigEndian
+	}
+	var n int64
+	high := false // a high surrogate waits for its low one
+	buf := make([]byte, 1<<20)
+	for pos := bom; pos < off; {
+		c := buf[:d.ReadAt(buf[:min(int64(len(buf)), off-pos)], pos)]
+		if len(c) == 0 {
+			break
+		}
+		if enc == ANSI {
+			if pos+int64(len(c)) < off {
+				c = c[:ansiSplit(c)]
+			}
+			pos += int64(len(c))
+			n += int64(len(ansiDecode(c)))
+			continue
+		}
+		pos += int64(len(c))
+		for i := 0; i+1 < len(c); i += 2 {
+			u := order.Uint16(c[i:])
+			switch {
+			case high && u >= 0xDC00 && u < 0xE000:
+				n += 4
+				high = false
+				continue
+			case high:
+				n += 3 // the lone one before this
+				high = false
+			}
+			switch {
+			case u < 0x80:
+				n++
+			case u < 0x800:
+				n += 2
+			case u >= 0xD800 && u < 0xDC00:
+				high = true
+			default:
+				n += 3
+			}
+		}
+	}
+	return n
 }

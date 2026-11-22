@@ -22,6 +22,8 @@ func ansiDecode(b []byte) []byte {
 	return out
 }
 
+func ansiSplit(b []byte) int { return len(b) }
+
 func ansiEncode(b []byte) (out []byte, lossy bool) {
 	out = make([]byte, 0, len(b))
 next:

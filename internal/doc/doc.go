@@ -28,6 +28,7 @@ const (
 	Typing                // inserting at the end of the previous insert
 	Backspace             // deleting right before the previous delete
 	Delete                // deleting at the place of the previous delete
+	Overtype              // changing or extending the text of the previous step
 )
 
 // rec is one step of the undo or redo list: at off, in bytes of the document
@@ -256,6 +257,13 @@ func (d *Doc) Replace(off, del int64, text []byte, kind Kind) {
 			r.off = off
 		case kind == Delete && len(text) == 0 && r.in == 0 && off == r.off:
 			r.out = append(r.out, removed...)
+		case kind == Overtype && off >= r.off && off+del <= r.off+r.in:
+			// Inside the text that the step put there: what is replaced
+			// was never part of the document before the step.
+			r.in += int64(len(text)) - del
+		case kind == Overtype && off == r.off+r.in:
+			r.out = append(r.out, removed...)
+			r.in += int64(len(text))
 		default:
 			joined = false
 		}

@@ -55,6 +55,15 @@ func ansiDecode(b []byte) []byte {
 	return out
 }
 
+// ansiSplit returns how many bytes at the start of b are whole characters
+// when more bytes follow.
+func ansiSplit(b []byte) int {
+	if n := len(b); n > 1 && isLeadByte(b[n-1]) && !trailAt(b, n-1) {
+		return n - 1
+	}
+	return len(b)
+}
+
 // trailAt reports whether b[i] is the second byte of a double byte
 // character, by walking from the start of the run of lead bytes before it.
 func trailAt(b []byte, i int) bool {

@@ -124,6 +124,13 @@ type Editor struct {
 
 	cache map[int64]*layout
 
+	// The binary mode, see hex.go.
+	hex      bool
+	hexChars bool // the caret is in the character column
+	nibble   int  // the hex digit of the byte at the caret that is typed next
+	ovr      bool // typing replaces bytes
+	hexText  []uint16
+
 	dragging  bool
 	wheelAcc  int
 	highSurr  rune
@@ -142,7 +149,7 @@ const timerAutoScroll = 1
 
 // NewEditor creates the editor as a child of parent.
 func NewEditor(parent ui.Parent) *Editor {
-	e := &Editor{zoom: 100, maxTop: -1, wantX: -1, cache: map[int64]*layout{}}
+	e := &Editor{zoom: 100, maxTop: -1, wantX: -1, ovr: true, cache: map[int64]*layout{}}
 	e.d = doc.New(nil, nil, nil)
 	e.colors = editorColors{
 		bg: sysColor(co.COLOR_WINDOW), fg: sysColor(co.COLOR_WINDOWTEXT),
@@ -168,7 +175,7 @@ func (e *Editor) Doc() *doc.Doc { return e.d }
 func (e *Editor) SetDoc(d *doc.Doc, eol doc.EOL) {
 	e.d, e.eol = d, eol
 	e.top, e.xoff, e.maxW = 0, 0, 0
-	e.anchor, e.caret, e.caretEOL, e.wantX = 0, 0, false, -1
+	e.anchor, e.caret, e.caretEOL, e.wantX, e.nibble = 0, 0, false, -1, 0
 	e.relayout()
 }
 
@@ -216,8 +223,12 @@ func (e *Editor) SetFont(lf logFont, zoom int) {
 		scaled.Height = -1
 	}
 	scaled.Width = 0
-	e.font = createFont(&scaled)
-	procSelectObject.Call(e.memDC, e.font)
+	if e.hex {
+		e.font, _ = fixedFont(e.memDC, scaled)
+	} else {
+		e.font = createFont(&scaled)
+		procSelectObject.Call(e.memDC, e.font)
+	}
 	var tm textMetric
 	procGetTextMetricsW.Call(e.memDC, uintptr(unsafe.Pointer(&tm)))
 	e.lineH = max(1, tm.Height+tm.ExternalLeading)
@@ -238,7 +249,7 @@ func (e *Editor) SetWrap(wrap bool) {
 		return
 	}
 	e.xoff = 0
-	procShowScrollBar.Call(uintptr(e.Hwnd()), uintptr(co.SBB_HORZ), boolArg(!wrap))
+	procShowScrollBar.Call(uintptr(e.Hwnd()), uintptr(co.SBB_HORZ), boolArg(!wrap || e.hex))
 	e.relayout()
 }
 
@@ -331,6 +342,9 @@ func (e *Editor) events() {
 func (e *Editor) createCaret() {
 	width := uint32(1)
 	procSystemParametersInfoW.Call(spiGetCaretWidth, 0, uintptr(unsafe.Pointer(&width)), 0)
+	if e.hex && e.ovr { // a block over the digit or character
+		width = uint32(e.avgW)
+	}
 	procCreateCaret.Call(uintptr(e.Hwnd()), 0, uintptr(max(1, width)), uintptr(e.lineH))
 	e.Hwnd().ShowCaret()
 }
@@ -552,6 +566,9 @@ func (e *Editor) place(off int64, eol bool) (*layout, int, int32) {
 
 // rowStart returns the offset of the first character of the row that shows off.
 func (e *Editor) rowStart(off int64) int64 {
+	if e.hex {
+		return hexRowStart(off)
+	}
 	l, r, _ := e.place(off, false)
 	return l.offsetOf(int(l.rows[r]))
 }
@@ -566,6 +583,12 @@ func (e *Editor) softRowStart(off int64) bool {
 
 // nextRow returns the start of the row after the row that starts at off.
 func (e *Editor) nextRow(off int64) (int64, bool) {
+	if e.hex {
+		if off >= e.hexLastRow() {
+			return off, false
+		}
+		return hexRowStart(off) + hexCols, true
+	}
 	l, r, _ := e.place(off, false)
 	if r+1 < len(l.rows) {
 		return l.offsetOf(int(l.rows[r+1])), true
@@ -577,6 +600,12 @@ func (e *Editor) nextRow(off int64) (int64, bool) {
 }
 
 func (e *Editor) prevRow(off int64) (int64, bool) {
+	if e.hex {
+		if off < hexCols {
+			return off, false
+		}
+		return hexRowStart(off) - hexCols, true
+	}
 	l, r, _ := e.place(off, false)
 	if r > 0 {
 		return l.offsetOf(int(l.rows[r-1])), true
@@ -590,6 +619,9 @@ func (e *Editor) prevRow(off int64) (int64, bool) {
 
 // moveRows returns the row start n rows from the row that starts at off.
 func (e *Editor) moveRows(off int64, n int) int64 {
+	if e.hex {
+		return e.hexMoveRows(off, n)
+	}
 	for ; n > 0; n-- {
 		next, ok := e.nextRow(off)
 		if !ok {
@@ -628,6 +660,14 @@ func (e *Editor) clampTop() {
 // hit returns the offset at a point in the client area, and whether the
 // caret belongs at the end of the row above for it.
 func (e *Editor) hit(px, py int32) (int64, bool) {
+	if e.hex {
+		area := 0
+		if e.hexChars {
+			area = 1
+		}
+		_, _, _, edge := e.hexAt(px, py, area)
+		return edge, false
+	}
 	row := e.top
 	for i := int32(0); i < max(0, py)/e.lineH; i++ {
 		next, ok := e.nextRow(row)
@@ -706,6 +746,10 @@ func (e *Editor) paint() {
 
 // drawRow draws the row that starts at off into the row bitmap.
 func (e *Editor) drawRow(off, selA, selB int64) {
+	if e.hex {
+		e.drawHexRow(off, selA, selB)
+		return
+	}
 	full := win.RECT{Right: e.cw, Bottom: e.lineH}
 	fillRect(e.memDC, &full, e.colors.bg)
 	l, r, _ := e.place(off, false)
@@ -799,7 +843,9 @@ func (e *Editor) updateScrollBars() {
 		}
 	}
 	h.SetScrollInfo(co.SBB_VERT, &si, true)
-	if e.wrap {
+	if e.hex {
+		e.maxW = int32(hexCells(e.hexDigits())-1) * e.avgW
+	} else if e.wrap {
 		return
 	}
 	si = win.SCROLLINFO{}
@@ -827,7 +873,7 @@ func (e *Editor) setTop(top int64) {
 func (e *Editor) scrollRows(n int) { e.setTop(e.moveRows(e.top, n)) }
 
 func (e *Editor) scrollX(dx int32) {
-	if e.wrap {
+	if e.wrap && !e.hex {
 		return
 	}
 	old := e.xoff
@@ -921,6 +967,9 @@ func abs(v int) int {
 
 // caretPoint returns the client position of the caret.
 func (e *Editor) caretPoint() (x, y int32, visible bool) {
+	if e.hex {
+		return e.hexCaretPoint()
+	}
 	l, r, cx := e.place(e.caret, e.caretEOL)
 	target := l.offsetOf(int(l.rows[r]))
 	if target < e.top {
@@ -964,6 +1013,10 @@ func (e *Editor) updateCaret() {
 
 // reveal scrolls so that the caret is in view.
 func (e *Editor) reveal() {
+	if e.hex {
+		e.hexReveal()
+		return
+	}
 	l, r, cx := e.place(e.caret, e.caretEOL)
 	target := l.offsetOf(int(l.rows[r]))
 	top := e.top

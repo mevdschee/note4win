@@ -206,9 +206,14 @@ func (a *App) render(hdc uintptr) bool {
 	lf := a.ed.lf
 	lf.Height = -int32(mulDiv(a.cfg.FontSize, int(dpiY), 720))
 	lf.Width = 0
-	font := createFont(&lf)
+	var font, old uintptr
+	if a.binary {
+		font, old = fixedFont(hdc, lf)
+	} else {
+		font = createFont(&lf)
+		old, _, _ = procSelectObject.Call(hdc, font)
+	}
 	defer deleteObject(font)
-	old, _, _ := procSelectObject.Call(hdc, font)
 	defer procSelectObject.Call(hdc, old)
 	var tm textMetric
 	procGetTextMetricsW.Call(hdc, uintptr(unsafe.Pointer(&tm)))
@@ -288,7 +293,16 @@ func (a *App) render(hdc uintptr) bool {
 	}
 
 	d := a.ed.Doc()
-	for off := int64(0); !failed; {
+	if a.binary { // the rows of the window; what does not fit is cut off
+		digits := hexAddrDigits(d.Len())
+		var b [hexCols]byte
+		var text []uint16
+		for off := int64(0); off < d.Len() && !failed; off += hexCols {
+			text = hexRow(text[:0], digits, off, b[:d.ReadAt(b[:], off)])
+			row(text)
+		}
+	}
+	for off := int64(0); !failed && !a.binary; {
 		ls, le, ln := d.LineBounds(off)
 		// A long line goes through in parts, each wrapped on its own.
 		for part := ls; ; {

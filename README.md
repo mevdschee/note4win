@@ -14,8 +14,8 @@ in seconds and scrolls, searches and edits like a small one.
 
 - The Notepad menus: File (New, New Window, Open, Save, Save As, Page Setup,
   Print), Edit (Undo, Cut, Copy, Paste, Delete, Find, Find Next, Find Previous,
-  Replace, Go To, Select All, Time/Date), Format (Word Wrap, Font), View (Zoom,
-  Status Bar) and Help.
+  Replace, Go To, Select All, Time/Date), Format (Word Wrap, Font), View (Text
+  Mode, Binary Mode, Zoom, Status Bar) and Help.
 - Title bar with the file name and a star for unsaved changes, and the "Do you
   want to save changes" question with Save, Don't Save and Cancel.
 - Status bar with line and column, zoom, line ending and encoding.
@@ -33,15 +33,47 @@ in seconds and scrolls, searches and edits like a small one.
   `&d`, `&t`, `&l`, `&c`, `&r` and `&&`) and printing in the font of the window.
 - The `.LOG` trick: a file that starts with `.LOG` gets the time and date added
   each time it is opened.
-- `text4win file` opens a file, `text4win /p file` prints it.
+- `text4win file` opens a file, `text4win /p file` prints it and
+  `text4win /b file` opens it in binary mode.
 - Follows the light and dark app mode of Windows.
 - Checks for a newer release on request (Help, Check for Updates) and installs
   it. Nothing is checked automatically.
 
-Where it differs from Notepad on purpose: undo has many levels (Ctrl+Y or
+Where it differs from Notepad on purpose: there is a binary mode (see below), undo has many levels (Ctrl+Y or
 Ctrl+Shift+Z is redo), a selected line break is shown, the menu bar has the
 colour of the status bar instead of white, and the Search with Bing and Send
 Feedback menu items are gone.
+
+## Binary mode
+
+View, Binary Mode shows the bytes of the file like a hex editor: rows of 16
+bytes with their address, the bytes in hex and the bytes as characters. View,
+Text Mode goes back, and Ctrl+B changes between the two. A window starts in
+text mode, unless it is started as `text4win /b file`. Huge files work the
+same way in both modes.
+
+- The caret is in the hex column or in the character column; Tab changes
+  that, and so does a click. In the hex column you type hex digits, in the
+  character column the characters themselves.
+- Insert changes between OVR and INS, shown in the status bar. In OVR mode,
+  the default, typing and pasting replace bytes and nothing can be deleted,
+  so every byte stays at its address; only typing at the end makes the file
+  longer. In INS mode bytes are inserted and deleted as in text mode.
+- Copy in the hex column gives hex digits (`4D 5A 90`), and text like that is
+  pasted there as bytes. The character column copies and pastes text.
+- Find and Replace have a choice between "Hex bytes" and "Text" in binary
+  mode, set to the column of the caret when the dialog opens. With "Hex
+  bytes" `4D 5A` looks for those two bytes, with "Text" for those five
+  characters. Go To asks for an address, decimal or hex after `0x`.
+- The status bar shows the address of the caret and the size of the file.
+- The font of the window is used when all its characters have the same
+  width, otherwise Consolas. Word Wrap and Time/Date do not apply.
+- Changing the mode keeps the edits and the undo list of a UTF-8 file, where
+  text and bytes are the same thing. A file in another encoding (ANSI,
+  UTF-16, UTF-8 with BOM) is read again in the other mode, after the question
+  to save changes, because its text is a conversion of its bytes. The caret
+  stays at the same character; finding it takes one pass over the text before
+  it. In binary mode Save writes the bytes as they are.
 
 ## Huge files
 
@@ -90,6 +122,8 @@ Limits to know about:
 | Ctrl+Plus, Ctrl+Minus, Ctrl+0 | Zoom in, zoom out, 100%      |
 | Ctrl+Backspace              | Delete the word before the caret |
 | Ctrl+W                      | Close the window               |
+| Ctrl+B                      | Text mode or binary mode       |
+| Tab, Insert (binary mode)   | Other column, OVR or INS       |
 
 ## Install
 
@@ -154,7 +188,7 @@ needs the GitHub CLI (`gh`). The installer is defined in
 
 - `internal/doc`: the document. Piece table, line index, search, encodings,
   memory mapping. No user interface, tested on any platform.
-- `internal/ui`: the window. `editor.go` is the text area, `app.go` the menus
-  and commands, `find.go` the Find, Replace and Go To dialogs, `print.go`
-  printing, `theme.go` light and dark.
+- `internal/ui`: the window. `editor.go` is the text area, `hex.go` its binary
+  mode, `app.go` the menus and commands, `find.go` the Find, Replace and Go To
+  dialogs, `print.go` printing, `theme.go` light and dark.
 - `internal/config`, `internal/update`: settings and the update check.
