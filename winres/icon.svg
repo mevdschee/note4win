@@ -1,29 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <!--
-    The text4win icon: a sheet of text with a dog-ear and a blinking caret.
-    Kept to a few bold shapes on a 16 unit grid, without shadows or detail,
-    so it stays readable at 16 px (one grid unit is one pixel there).
-    Rendered to PNG by tools/genicon.
+    The text4win icon: a variation on the Notepad icon of Windows 10, drawn
+    from scratch. A light blue spiral pad on a stack of white pages with an
+    amber back, four rings and three lines of text, the last one short. No
+    backdrop. Everything sits on a 16 unit grid, so it stays readable at
+    16 px (one grid unit is one pixel there). Rendered to PNG by
+    tools/genicon.
   -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#29A3F2"/>
-      <stop offset="1" stop-color="#0A5FC2"/>
+    <linearGradient id="cover" gradientUnits="userSpaceOnUse" x1="32" y1="32" x2="224" y2="192">
+      <stop offset="0" stop-color="#8AD4FB"/>
+      <stop offset="1" stop-color="#3FA3EA"/>
     </linearGradient>
   </defs>
 
-  <!-- tile -->
-  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <!-- back, pages, cover -->
+  <rect x="32" y="96" width="192" height="128" rx="24" fill="#F29A0C"/>
+  <rect x="32" y="96" width="192" height="112" rx="24" fill="#F4F7FA"/>
+  <rect x="32" y="32" width="192" height="160" rx="24" fill="url(#cover)"/>
 
-  <!-- sheet with a folded corner -->
-  <path d="M64 32 H160 L208 80 V208 A16 16 0 0 1 192 224 H64 A16 16 0 0 1 48 208 V48 A16 16 0 0 1 64 32 Z" fill="#FFFFFF"/>
-  <path d="M160 32 L208 80 H172 A12 12 0 0 1 160 68 Z" fill="#A9D4F7"/>
+  <!-- rings -->
+  <rect x="48" y="16" width="16" height="40" rx="8" fill="#0B4F9E"/>
+  <rect x="96" y="16" width="16" height="40" rx="8" fill="#0B4F9E"/>
+  <rect x="144" y="16" width="16" height="40" rx="8" fill="#0B4F9E"/>
+  <rect x="192" y="16" width="16" height="40" rx="8" fill="#0B4F9E"/>
 
   <!-- lines of text -->
-  <rect x="72" y="104" width="112" height="16" rx="8" fill="#1976D2"/>
-  <rect x="72" y="136" width="96" height="16" rx="8" fill="#1976D2"/>
-  <rect x="72" y="168" width="48" height="16" rx="8" fill="#1976D2"/>
-
-  <!-- caret -->
-  <rect x="132" y="160" width="16" height="48" rx="6" fill="#FFA000"/>
+  <rect x="64" y="80" width="128" height="16" rx="8" fill="#0B4F9E"/>
+  <rect x="64" y="112" width="128" height="16" rx="8" fill="#0B4F9E"/>
+  <rect x="64" y="144" width="64" height="16" rx="8" fill="#0B4F9E"/>
 </svg>
