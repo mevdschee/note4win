@@ -7,8 +7,8 @@ package ui
 // the app runs. Popup menus and scrollbars only turn dark through
 // undocumented uxtheme functions, which exist on Windows 10 1809 and later;
 // the menu bar and the status bar have no dark look at all in Windows and
-// are painted here in dark mode. The menu bar is painted in light mode as
-// well, to give it the colour of the status bar.
+// are painted here in dark mode. In light mode Windows draws them, as it does
+// for Notepad.
 //
 // TEXT4WIN_THEME=dark (or light) overrides the system setting, which helps
 // to try the dark look under Wine.
@@ -57,8 +57,7 @@ var (
 	}
 	darkMode bool
 	colors   palette
-	// ownBar tells that the menu bar is painted here, in the colour of the
-	// status bar: always, except with a High Contrast theme.
+	// ownBar tells that the menu bar is painted here, which is in dark mode.
 	ownBar bool
 )
 
@@ -146,7 +145,7 @@ func loadTheme() bool {
 		colors.field = sysColor(co.COLOR_WINDOW)
 		colors.bar = sysColor(co.COLOR_BTNFACE) // what the status bar has
 	}
-	ownBar = !highContrast()
+	ownBar = dark
 	if changed && uxFlushMenuThemes != 0 {
 		syscall.SyscallN(uxFlushMenuThemes)
 	}
@@ -280,9 +279,12 @@ func newModal(parent ui.Parent, opts *ui.VarOptsModal) *ui.Modal {
 
 // ---- the menu bar ----
 //
-// Windows draws the menu bar white (and has no dark one at all), next to a
-// grey status bar. Here it gets the colour of the status bar in both modes,
-// through the undocumented messages that Windows sends to paint it.
+// Windows draws the menu bar white, with two thin lines under it: the lower
+// edge of the bar and a line in the colour of the status bar, between the
+// bar and the text. That is what Notepad looks like, so in light mode
+// nothing is done here. There is no dark menu bar in Windows: in dark mode
+// it is painted here, in the colour of the status bar, through the
+// undocumented messages that Windows sends to paint it.
 
 const (
 	wmUahDrawMenu     = co.WM(0x0091)
@@ -366,7 +368,8 @@ func (a *App) menuBarEvents() {
 		procDrawTextW.Call(d.um.hdc, uintptr(unsafe.Pointer(&text[0])), ^uintptr(0), uintptr(unsafe.Pointer(&d.rcItem)), flags)
 		return 1
 	})
-	// Windows draws a white line under the menu bar; paint over it.
+	// The line between the menu bar and the text is not part of the bar
+	// and stays light in dark mode; paint a dark one over it.
 	for _, msg := range []co.WM{co.WM_NCPAINT, co.WM_NCACTIVATE} {
 		on.Wm(msg, func(p ui.Wm) uintptr {
 			h := a.wnd.Hwnd()
@@ -377,7 +380,7 @@ func (a *App) menuBarEvents() {
 				wr, _ := h.GetWindowRect()
 				line := win.RECT{Left: rc.Left - wr.Left, Right: rc.Right - wr.Left, Top: rc.Top - wr.Top - 1, Bottom: rc.Top - wr.Top}
 				if hdc, err := h.GetWindowDC(); err == nil {
-					fillRect(uintptr(hdc), &line, colors.bar)
+					fillRect(uintptr(hdc), &line, colors.barLine)
 					h.ReleaseDC(hdc)
 				}
 			}
