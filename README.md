@@ -1,9 +1,12 @@
 # text4win
 
-A Notepad for Windows that opens huge files, written in Go with
-[Windigo](https://github.com/rodrigocfd/windigo). It looks and works like the
-Notepad of Windows 10: the same menus, shortcuts, dialogs and status bar, one
-window per file and no tabs. The difference is under the hood. Notepad loads a
+The Notepad of Windows 10, without Copilot, tabs or sign-ins, that also opens
+files of many gigabytes in seconds. Written in Go with
+[Windigo](https://github.com/rodrigocfd/windigo).
+
+It looks and works like the old Notepad: the same menus, shortcuts, dialogs
+and status bar, one window per file and no tabs. There is no account and no
+AI, and nothing is sent anywhere. The difference is under the hood. Notepad loads a
 file into a Windows edit control and gives up on large ones; text4win draws the
 text itself and leaves the file where it is, so a log of many gigabytes opens
 in seconds and scrolls, searches and edits like a small one. A binary mode
@@ -38,7 +41,8 @@ shows the same file as a hex editor does.
   `text4win /b file` opens it in binary mode.
 - Follows the light and dark app mode of Windows.
 - Checks for a newer release on request (Help, Check for Updates) and installs
-  it. Nothing is checked automatically.
+  it, or opens the download page in a portable copy. Nothing is checked
+  automatically.
 
 Where it differs from Notepad on purpose: there is a binary mode (see below),
 undo has many levels (Ctrl+Y or Ctrl+Shift+Z is redo), a selected line break is
@@ -141,6 +145,21 @@ After the install text4win is in the "Open with" list of Explorer and
 `text4win` works in the Run box. It does not take over `.txt` files: choose
 "Open with", "Choose another app" and "Always" if you want that.
 
+To use it without installing, download `text4win-<version>-amd64.exe`
+instead and run it from anywhere. It is the same program the installer
+installs. The settings still go to `%APPDATA%\text4win`, and Check for Updates
+opens the download page instead of installing.
+
+Each release has a `SHA256SUMS` file. To check a download, compare its hash
+with the one listed there, for example in PowerShell:
+
+    Get-FileHash text4win-<version>-amd64.exe
+
+The files are not signed, so SmartScreen and some virus scanners may warn
+about them, as they do for many unsigned programs. If one does, check the
+hash first. The source and the build script are in this repository, so you can
+also build the exe yourself.
+
 It runs on 64-bit Windows 10 and 11.
 
 ## Data
@@ -181,8 +200,9 @@ The icon is `winres/icon.svg`. After changing it, run `go run ./tools/genicon`
 `release.sh` needs a clean working tree. It raises the version in
 `winres/winres.json` (`file_version`, as `major.minor.build.revision`; the
 revision goes up on every release), runs the tests, builds
-`dist/text4win-<version>-amd64.msi`, commits and pushes the version bump and
-creates the GitHub release with the MSI. Besides the build tools above it
+`dist/text4win-<version>-amd64.msi`, the portable
+`dist/text4win-<version>-amd64.exe` and `dist/SHA256SUMS`, commits and pushes
+the version bump and creates the GitHub release with those three files. Besides the build tools above it
 needs the GitHub CLI (`gh`). The installer is defined in
 `installer/text4win.wxs`.
 

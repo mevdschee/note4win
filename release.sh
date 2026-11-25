@@ -15,8 +15,10 @@
 # three numbers, so every release raises at least the build. The revision
 # goes up on every release as well.
 #
-# The script builds dist/text4win-<version>-amd64.msi, commits and pushes the
-# version bump and creates the GitHub release v<version> with the MSI. With
+# The script builds dist/text4win-<version>-amd64.msi, the portable
+# dist/text4win-<version>-amd64.exe (the same exe the MSI installs) and
+# dist/SHA256SUMS, commits and pushes the version bump and creates the GitHub
+# release v<version> with those three files. With
 # "msi" it stops after building: nothing is changed, committed or published,
 # which is for trying the installer.
 set -e
@@ -80,10 +82,16 @@ msibuild $msi -i dist/seq.idt
 rm dist/seq.idt
 # The exe must be versioned in the File table, see installer/text4win.wxs.
 msiinfo export $msi File | grep -q $'\t'"$version.$revision"$'\t'
-ls -l $msi
+
+# The portable exe and the checksums.
+exe=dist/text4win-$version-amd64.exe
+cp dist/text4win.exe $exe
+(cd dist && sha256sum "$(basename $msi)" "$(basename $exe)" >SHA256SUMS)
+ls -l $msi $exe
+cat dist/SHA256SUMS
 [ $part != msi ] || exit 0
 
 # Commit, push and publish.
 git commit -q -m "Release v$version" $json
 git push
-gh release create v$version --title v$version $msi
+gh release create v$version --title v$version $msi $exe dist/SHA256SUMS
