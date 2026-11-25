@@ -1,4 +1,4 @@
-# text4win
+# note4win
 
 The Notepad of Windows 10, without Copilot, tabs or sign-ins, that also opens
 files of many gigabytes in seconds. Written in Go with
@@ -7,12 +7,12 @@ files of many gigabytes in seconds. Written in Go with
 It looks and works like the old Notepad: the same menus, shortcuts, dialogs
 and status bar, one window per file and no tabs. There is no account and no
 AI, and nothing is sent anywhere. The difference is under the hood. Notepad loads a
-file into a Windows edit control and gives up on large ones; text4win draws the
+file into a Windows edit control and gives up on large ones; note4win draws the
 text itself and leaves the file where it is, so a log of many gigabytes opens
 in seconds and scrolls, searches and edits like a small one. A binary mode
 shows the same file as a hex editor does.
 
-![text4win](screenshot.png)
+![note4win](screenshot.png)
 
 ## Features
 
@@ -37,8 +37,8 @@ shows the same file as a hex editor does.
   `&d`, `&t`, `&l`, `&c`, `&r` and `&&`) and printing in the font of the window.
 - The `.LOG` trick: a file that starts with `.LOG` gets the time and date added
   each time it is opened.
-- `text4win file` opens a file, `text4win /p file` prints it and
-  `text4win /b file` opens it in binary mode.
+- `note4win file` opens a file, `note4win /p file` prints it and
+  `note4win /b file` opens it in binary mode.
 - Follows the light and dark app mode of Windows.
 - Checks for a newer release on request (Help, Check for Updates) and installs
   it, or opens the download page in a portable copy. Nothing is checked
@@ -53,10 +53,10 @@ shown, and the Search with Bing and Send Feedback menu items are gone.
 View, Binary Mode shows the bytes of the file like a hex editor: rows of 16
 bytes with their address, the bytes in hex and the bytes as characters. View,
 Text Mode goes back, and Ctrl+B changes between the two. A window starts in
-text mode, unless it is started as `text4win /b file`. Huge files work the
+text mode, unless it is started as `note4win /b file`. Huge files work the
 same way in both modes.
 
-![text4win in binary mode](screenshot-binary.png)
+![note4win in binary mode](screenshot-binary.png)
 
 - The caret is in the hex column or in the character column; Tab changes
   that, and so does a click. In the hex column you type hex digits, in the
@@ -133,29 +133,29 @@ Limits to know about:
 
 ## Install
 
-Download `text4win-<version>-amd64.msi` from the
-[releases](https://github.com/mevdschee/text4win/releases) and run it. It
-installs `text4win.exe` in `%LOCALAPPDATA%\Programs\text4win` and adds a
-"text4win" shortcut to the Start menu. It installs for the current user only,
+Download `note4win-<version>-amd64.msi` from the
+[releases](https://github.com/mevdschee/note4win/releases) and run it. It
+installs `note4win.exe` in `%LOCALAPPDATA%\Programs\note4win` and adds a
+"note4win" shortcut to the Start menu. It installs for the current user only,
 so it does not need admin rights. Newer versions replace older ones. The
 installer is not signed, so Windows SmartScreen may ask you to confirm ("More
 info", "Run anyway").
 
-After the install text4win is in the "Open with" list of Explorer and
-`text4win` works in the Run box. It does not take over `.txt` files: choose
+After the install note4win is in the "Open with" list of Explorer and
+`note4win` works in the Run box. It does not take over `.txt` files: choose
 "Open with", "Choose another app" and "Always" if you want that.
 
-To use it without installing, download `text4win-<version>-amd64.exe`
+To use it without installing, download `note4win-<version>-amd64.exe`
 instead and run it from anywhere. It is the same program the installer
-installs. For Windows on ARM there is `text4win-<version>-arm64.exe`, a
+installs. For Windows on ARM there is `note4win-<version>-arm64.exe`, a
 native build that is only available as a portable exe; the installer works
-there too, but runs the amd64 build emulated. The settings still go to `%APPDATA%\text4win`, and Check for Updates
+there too, but runs the amd64 build emulated. The settings still go to `%APPDATA%\note4win`, and Check for Updates
 opens the download page instead of installing.
 
 Each release has a `SHA256SUMS` file. To check a download, compare its hash
 with the one listed there, for example in PowerShell:
 
-    Get-FileHash text4win-<version>-amd64.exe
+    Get-FileHash note4win-<version>-amd64.exe
 
 The files are not signed, so SmartScreen and some virus scanners may warn
 about them, as they do for many unsigned programs. If one does, check the
@@ -167,7 +167,7 @@ It runs on 64-bit Windows 10 and 11.
 ## Data
 
 Settings (font, word wrap, status bar, window position and page setup) are in
-`%APPDATA%\text4win\settings.json`. The only network access is the update check
+`%APPDATA%\note4win\settings.json`. The only network access is the update check
 you start yourself.
 
 ## Build (on Linux)
@@ -178,15 +178,15 @@ Install the tools once:
     go install github.com/tc-hib/go-winres@latest
 
 The icon, manifest (visual styles, DPI awareness) and version info are compiled
-from `winres/` into `cmd/text4win/rsrc_windows_<arch>.syso`, which is not
+from `winres/` into `cmd/note4win/rsrc_windows_<arch>.syso`, which is not
 committed. `run.sh` and `release.sh` generate it.
 
     go test ./...
     ./run.sh [file]
 
-`run.sh` builds `text4win.exe` and runs it with Wine. Wine has its own
+`run.sh` builds `note4win.exe` and runs it with Wine. Wine has its own
 `%APPDATA%`, so the settings there are kept apart from a real install.
-`TEXT4WIN_THEME=dark ./run.sh` shows the dark colours. Wine draws the menu bar
+`NOTE4WIN_THEME=dark ./run.sh` shows the dark colours. Wine draws the menu bar
 itself, always white, and has no dark menus and scrollbars.
 
 The icon is `winres/icon.svg`. After changing it, run `go run ./tools/genicon`
@@ -202,13 +202,13 @@ The icon is `winres/icon.svg`. After changing it, run `go run ./tools/genicon`
 `release.sh` needs a clean working tree. It raises the version in
 `winres/winres.json` (`file_version`, as `major.minor.build.revision`; the
 revision goes up on every release), runs the tests, builds
-`dist/text4win-<version>-amd64.msi`, the portable
-`dist/text4win-<version>-amd64.exe` and `dist/text4win-<version>-arm64.exe`
+`dist/note4win-<version>-amd64.msi`, the portable
+`dist/note4win-<version>-amd64.exe` and `dist/note4win-<version>-arm64.exe`
 and `dist/SHA256SUMS`, commits and pushes the version bump and creates the
 GitHub release with those four files. wixl cannot build an arm64 MSI, so
 arm64 is only a portable exe. Besides the build tools above it needs the
 GitHub CLI (`gh`). The installer is defined in
-`installer/text4win.wxs`.
+`installer/note4win.wxs`.
 
 ## Layout
 

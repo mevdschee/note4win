@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/mevdschee/text4win/internal/config"
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/config"
+	"github.com/mevdschee/note4win/internal/doc"
 	"github.com/rodrigocfd/windigo/co"
 	"github.com/rodrigocfd/windigo/ui"
 	"github.com/rodrigocfd/windigo/win"
@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	appName  = "text4win"
-	repoURL  = "https://github.com/mevdschee/text4win"
+	appName  = "note4win"
+	repoURL  = "https://github.com/mevdschee/note4win"
 	author   = "Maurits van der Schee"
 	untitled = "Untitled"
 	iconId   = 1 // RT_GROUP_ICON "#1" in winres/winres.json
@@ -470,7 +470,7 @@ func (a *App) restoreWindow() {
 		if a.cfg.Width >= 200 && a.cfg.Height >= 120 {
 			rc = win.RECT{Left: int32(a.cfg.X), Top: int32(a.cfg.Y), Right: int32(a.cfg.X + a.cfg.Width), Bottom: int32(a.cfg.Y + a.cfg.Height)}
 		}
-		if pos := strings.Split(os.Getenv("TEXT4WIN_POS"), ","); len(pos) == 2 {
+		if pos := strings.Split(os.Getenv("NOTE4WIN_POS"), ","); len(pos) == 2 {
 			x, errX := strconv.Atoi(pos[0])
 			y, errY := strconv.Atoi(pos[1])
 			if errX == nil && errY == nil {
@@ -623,7 +623,7 @@ func (a *App) newWindow() {
 	cmd := exec.Command(exe)
 	if rc, err := a.wnd.Hwnd().GetWindowRect(); err == nil && !a.wnd.Hwnd().IsZoomed() {
 		step := int32(ui.DpiX(26))
-		cmd.Env = append(os.Environ(), fmt.Sprintf("TEXT4WIN_POS=%d,%d", rc.Left+step, rc.Top+step))
+		cmd.Env = append(os.Environ(), fmt.Sprintf("NOTE4WIN_POS=%d,%d", rc.Left+step, rc.Top+step))
 	}
 	a.saveSettings() // the new window starts with the same size and font
 	if err := cmd.Start(); err != nil {

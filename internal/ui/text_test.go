@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/doc"
 )
 
 func TestHeaderParts(t *testing.T) {

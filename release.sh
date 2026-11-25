@@ -3,7 +3,7 @@
 # go install github.com/tc-hib/go-winres@latest
 # sudo apt install jq wixl msitools gh
 #
-# Releases a new version of text4win:
+# Releases a new version of note4win:
 #
 #   ./release.sh          # 0.1.0 -> 0.1.1 (build, the default)
 #   ./release.sh minor    # 0.1.1 -> 0.2.0
@@ -15,9 +15,9 @@
 # three numbers, so every release raises at least the build. The revision
 # goes up on every release as well.
 #
-# The script builds dist/text4win-<version>-amd64.msi, the portable
-# dist/text4win-<version>-amd64.exe (the same exe the MSI installs), the
-# portable dist/text4win-<version>-arm64.exe (wixl cannot build an arm64 MSI;
+# The script builds dist/note4win-<version>-amd64.msi, the portable
+# dist/note4win-<version>-amd64.exe (the same exe the MSI installs), the
+# portable dist/note4win-<version>-arm64.exe (wixl cannot build an arm64 MSI;
 # Windows 11 on ARM runs the amd64 one emulated) and dist/SHA256SUMS, commits
 # and pushes the version bump and creates the GitHub release v<version> with
 # those four files. With "msi" it stops after building: nothing is changed, committed or published,
@@ -54,25 +54,25 @@ if [ $part != msi ]; then
 	  .RT_VERSION["#1"]["0000"].info["0409"].FileVersion = $v |
 	  .RT_VERSION["#1"]["0000"].info["0409"].ProductVersion = $v
 	' $json >$json.tmp && mv $json.tmp $json
-	echo "Releasing text4win $version (revision $revision)"
+	echo "Releasing note4win $version (revision $revision)"
 fi
 
-# Build the exe: icon, manifest and version info (cmd/text4win/rsrc_windows_amd64.syso,
+# Build the exe: icon, manifest and version info (cmd/note4win/rsrc_windows_amd64.syso,
 # not committed) and the version, which the About window shows.
-~/go/bin/go-winres make --arch amd64,arm64 --out cmd/text4win/rsrc
+~/go/bin/go-winres make --arch amd64,arm64 --out cmd/note4win/rsrc
 go test ./...
 GOOS=windows go vet ./...
 rm -rf dist && mkdir dist
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o dist/text4win.exe ./cmd/text4win
-arm=dist/text4win-$version-arm64.exe
-GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o $arm ./cmd/text4win
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o dist/note4win.exe ./cmd/note4win
+arm=dist/note4win-$version-arm64.exe
+GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o $arm ./cmd/note4win
 
 # Build the MSI.
-msi=dist/text4win-$version-amd64.msi
-go run ./tools/mkico dist/text4win.ico winres/icon.png winres/icon48.png winres/icon32.png winres/icon16.png
+msi=dist/note4win-$version-amd64.msi
+go run ./tools/mkico dist/note4win.ico winres/icon.png winres/icon48.png winres/icon32.png winres/icon16.png
 wixl -a x64 -D Version="$version" -D FileVersion="$version.$revision" \
-	-D ExePath=dist/text4win.exe -D IconPath=dist/text4win.ico \
-	-o $msi installer/text4win.wxs
+	-D ExePath=dist/note4win.exe -D IconPath=dist/note4win.ico \
+	-o $msi installer/note4win.wxs
 
 # wixl removes the old version right after InstallValidate, outside the
 # installation transaction: if the new install then fails, nothing is left.
@@ -83,12 +83,12 @@ sed -i 's/^RemoveExistingProducts\t\t1401\r\?$/RemoveExistingProducts\t\t1501\r/
 grep -q $'^RemoveExistingProducts\t\t1501\r$' dist/seq.idt
 msibuild $msi -i dist/seq.idt
 rm dist/seq.idt
-# The exe must be versioned in the File table, see installer/text4win.wxs.
+# The exe must be versioned in the File table, see installer/note4win.wxs.
 msiinfo export $msi File | grep -q $'\t'"$version.$revision"$'\t'
 
 # The portable amd64 exe and the checksums.
-exe=dist/text4win-$version-amd64.exe
-cp dist/text4win.exe $exe
+exe=dist/note4win-$version-amd64.exe
+cp dist/note4win.exe $exe
 (cd dist && sha256sum "$(basename $msi)" "$(basename $exe)" "$(basename $arm)" >SHA256SUMS)
 ls -l $msi $exe $arm
 cat dist/SHA256SUMS

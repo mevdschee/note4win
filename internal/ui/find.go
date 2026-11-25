@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/doc"
 	"github.com/rodrigocfd/windigo/co"
 	"github.com/rodrigocfd/windigo/ui"
 	"github.com/rodrigocfd/windigo/win"
@@ -53,7 +53,7 @@ const (
 	idCancel   = 2 // IDCANCEL: the Escape key
 )
 
-const findClass = "text4win.find"
+const findClass = "note4win.find"
 
 var (
 	findApp      *App

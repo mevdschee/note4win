@@ -3,12 +3,12 @@
 # go install github.com/tc-hib/go-winres@latest
 # sudo apt install wine
 #
-# Cross compiles text4win.exe for Windows and runs it with Wine:
+# Cross compiles note4win.exe for Windows and runs it with Wine:
 #
 #   ./run.sh
 #
 # Wine keeps its own %APPDATA%, so the settings are stored in
-# ~/.wine/drive_c/users/$USER/AppData/Roaming/text4win.
+# ~/.wine/drive_c/users/$USER/AppData/Roaming/note4win.
 set -e
 cd "$(dirname "$0")"
 
@@ -26,8 +26,8 @@ if [ -n "$missing" ]; then
 fi
 
 # Build the exe with icon, manifest and version info.
-"$winres" make --arch amd64 --out cmd/text4win/rsrc
-GOOS=windows GOARCH=amd64 go build -ldflags="-H windowsgui" -o text4win.exe ./cmd/text4win
+"$winres" make --arch amd64 --out cmd/note4win/rsrc
+GOOS=windows GOARCH=amd64 go build -ldflags="-H windowsgui" -o note4win.exe ./cmd/note4win
 
 # Run it.
-exec wine text4win.exe "$@"
+exec wine note4win.exe "$@"

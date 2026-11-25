@@ -1,5 +1,5 @@
-// Package config keeps the settings of text4win in
-// %APPDATA%\text4win\settings.json.
+// Package config keeps the settings of note4win in
+// %APPDATA%\note4win\settings.json.
 package config
 
 import (
@@ -55,7 +55,7 @@ func Dir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(base, "text4win"), nil
+	return filepath.Join(base, "note4win"), nil
 }
 
 // Load reads the settings; without a readable file it returns the defaults.

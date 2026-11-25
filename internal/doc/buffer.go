@@ -1,4 +1,4 @@
-// Package doc is the text document of text4win: a piece table over the
+// Package doc is the text document of note4win: a piece table over the
 // bytes of the file, which stay where they are (in a memory mapped file for
 // huge files), with a sparse line index. The text is UTF-8; it is never
 // normalized, so every byte that is not edited is saved back unchanged.

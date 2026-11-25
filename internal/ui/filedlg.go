@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/doc"
 	"github.com/rodrigocfd/windigo/co"
 	"github.com/rodrigocfd/windigo/win"
 	"github.com/rodrigocfd/windigo/x/cosh"

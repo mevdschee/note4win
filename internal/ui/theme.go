@@ -10,7 +10,7 @@ package ui
 // are painted here in dark mode. In light mode Windows draws them, as it does
 // for Notepad.
 //
-// TEXT4WIN_THEME=dark (or light) overrides the system setting, which helps
+// NOTE4WIN_THEME=dark (or light) overrides the system setting, which helps
 // to try the dark look under Wine.
 
 import (
@@ -94,7 +94,7 @@ func initTheme() {
 // systemDark reports whether Windows apps should be dark. With a High
 // Contrast theme the app stays light, which uses the system colours.
 func systemDark() bool {
-	switch os.Getenv("TEXT4WIN_THEME") {
+	switch os.Getenv("NOTE4WIN_THEME") {
 	case "dark":
 		return true
 	case "light":

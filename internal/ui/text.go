@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/doc"
 )
 
 // headerParts splits a header or footer in its left, centre and right text.

@@ -18,7 +18,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/mevdschee/text4win/internal/update"
+	"github.com/mevdschee/note4win/internal/update"
 	"github.com/rodrigocfd/windigo/co"
 	"github.com/rodrigocfd/windigo/ui"
 	"github.com/rodrigocfd/windigo/win"
@@ -118,13 +118,13 @@ func showAbout(a *App) {
 }
 
 // installed reports whether this is the copy the MSI installed, in
-// %LOCALAPPDATA%\Programs\text4win, and not the portable exe.
+// %LOCALAPPDATA%\Programs\note4win, and not the portable exe.
 func installed() bool {
 	exe, err := os.Executable()
 	if err != nil {
 		return false
 	}
-	dir := filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "text4win")
+	dir := filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "note4win")
 	return strings.EqualFold(filepath.Clean(filepath.Dir(exe)), filepath.Clean(dir))
 }
 
@@ -166,8 +166,8 @@ func (a *App) checkForUpdates() {
 	restore()
 	if err == nil {
 		// msiexec shows the installer; the MSI replaces the running version,
-		// so close to release text4win.exe.
-		log := filepath.Join(os.TempDir(), "text4win-update.log")
+		// so close to release note4win.exe.
+		log := filepath.Join(os.TempDir(), "note4win-update.log")
 		err = exec.Command("msiexec", "/i", path, "/l*v", log).Start()
 	}
 	if err != nil {

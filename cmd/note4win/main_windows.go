@@ -1,4 +1,4 @@
-// Command text4win is a Notepad for Windows that opens huge files.
+// Command note4win is a Notepad for Windows that opens huge files.
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/mevdschee/text4win/internal/ui"
+	"github.com/mevdschee/note4win/internal/ui"
 	"github.com/rodrigocfd/windigo/co"
 	wui "github.com/rodrigocfd/windigo/ui"
 	"github.com/rodrigocfd/windigo/win"
@@ -22,7 +22,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			wui.MsgError(nil, "text4win", "text4win crashed", fmt.Sprintf("%v\n\n%s", r, debug.Stack()))
+			wui.MsgError(nil, "note4win", "note4win crashed", fmt.Sprintf("%v\n\n%s", r, debug.Stack()))
 			os.Exit(2)
 		}
 	}()

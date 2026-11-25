@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/mevdschee/text4win/internal/doc"
+	"github.com/mevdschee/note4win/internal/doc"
 	"github.com/rodrigocfd/windigo/co"
 	"github.com/rodrigocfd/windigo/win"
 	"golang.org/x/sys/windows"
@@ -265,7 +265,7 @@ func (a *App) write(path string, enc doc.Encoding) bool {
 		return true
 	}
 
-	tmp := path + ".text4win.tmp"
+	tmp := path + ".note4win.tmp"
 	os.Remove(tmp) // left behind by a save that failed
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 	if err == nil {
@@ -298,7 +298,7 @@ func (a *App) write(path string, enc doc.Encoding) bool {
 			a.update()
 		}
 	})
-	return !strings.HasSuffix(path, ".text4win.tmp")
+	return !strings.HasSuffix(path, ".note4win.tmp")
 }
 
 // replaceFile moves tmp over path. When path exists it keeps its

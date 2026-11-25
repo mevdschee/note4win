@@ -40,14 +40,14 @@ func TestParseRelease(t *testing.T) {
 		"tag_name": "v0.3.0", "draft": false, "prerelease": false,
 		"assets": [
 			{"name": "notes.txt", "browser_download_url": "https://example.com/notes.txt", "size": 10},
-			{"name": "text4win-0.3.0-amd64.msi", "browser_download_url": "https://github.com/mevdschee/text4win/releases/download/v0.3.0/text4win-0.3.0-amd64.msi", "size": 3912192}
+			{"name": "note4win-0.3.0-amd64.msi", "browser_download_url": "https://github.com/mevdschee/note4win/releases/download/v0.3.0/note4win-0.3.0-amd64.msi", "size": 3912192}
 		]}`)
 	r, ok := ParseRelease(data)
 	if !ok {
 		t.Fatal("no release found")
 	}
-	want := Release{Version: "0.3.0", MsiName: "text4win-0.3.0-amd64.msi", MsiSize: 3912192,
-		MsiURL: "https://github.com/mevdschee/text4win/releases/download/v0.3.0/text4win-0.3.0-amd64.msi"}
+	want := Release{Version: "0.3.0", MsiName: "note4win-0.3.0-amd64.msi", MsiSize: 3912192,
+		MsiURL: "https://github.com/mevdschee/note4win/releases/download/v0.3.0/note4win-0.3.0-amd64.msi"}
 	if r != want {
 		t.Errorf("got %+v", r)
 	}

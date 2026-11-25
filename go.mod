@@ -1,4 +1,4 @@
-module github.com/mevdschee/text4win
+module github.com/mevdschee/note4win
 
 go 1.27.3
 

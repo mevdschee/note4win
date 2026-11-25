@@ -1,4 +1,4 @@
-// Package update checks GitHub for a newer text4win release and downloads
+// Package update checks GitHub for a newer note4win release and downloads
 // its MSI. Installing is left to msiexec.
 package update
 
@@ -16,7 +16,7 @@ import (
 )
 
 // LatestReleaseURL is the GitHub API endpoint for the newest release.
-const LatestReleaseURL = "https://api.github.com/repos/mevdschee/text4win/releases/latest"
+const LatestReleaseURL = "https://api.github.com/repos/mevdschee/note4win/releases/latest"
 
 // Release is the part of the GitHub release JSON the update check needs.
 type Release struct {
@@ -116,7 +116,7 @@ func httpGet(ctx context.Context, url, current string, limit int64) ([]byte, err
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "text4win/"+current)
+	req.Header.Set("User-Agent", "note4win/"+current)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

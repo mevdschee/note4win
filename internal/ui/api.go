@@ -1,6 +1,6 @@
 //go:build windows
 
-// Package ui is the text4win window: a Notepad look-alike made of a menu, a
+// Package ui is the note4win window: a Notepad look-alike made of a menu, a
 // text editor control that is drawn with GDI and a status bar.
 package ui
 
