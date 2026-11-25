@@ -147,7 +147,9 @@ After the install text4win is in the "Open with" list of Explorer and
 
 To use it without installing, download `text4win-<version>-amd64.exe`
 instead and run it from anywhere. It is the same program the installer
-installs. The settings still go to `%APPDATA%\text4win`, and Check for Updates
+installs. For Windows on ARM there is `text4win-<version>-arm64.exe`, a
+native build that is only available as a portable exe; the installer works
+there too, but runs the amd64 build emulated. The settings still go to `%APPDATA%\text4win`, and Check for Updates
 opens the download page instead of installing.
 
 Each release has a `SHA256SUMS` file. To check a download, compare its hash
@@ -176,7 +178,7 @@ Install the tools once:
     go install github.com/tc-hib/go-winres@latest
 
 The icon, manifest (visual styles, DPI awareness) and version info are compiled
-from `winres/` into `cmd/text4win/rsrc_windows_amd64.syso`, which is not
+from `winres/` into `cmd/text4win/rsrc_windows_<arch>.syso`, which is not
 committed. `run.sh` and `release.sh` generate it.
 
     go test ./...
@@ -201,9 +203,11 @@ The icon is `winres/icon.svg`. After changing it, run `go run ./tools/genicon`
 `winres/winres.json` (`file_version`, as `major.minor.build.revision`; the
 revision goes up on every release), runs the tests, builds
 `dist/text4win-<version>-amd64.msi`, the portable
-`dist/text4win-<version>-amd64.exe` and `dist/SHA256SUMS`, commits and pushes
-the version bump and creates the GitHub release with those three files. Besides the build tools above it
-needs the GitHub CLI (`gh`). The installer is defined in
+`dist/text4win-<version>-amd64.exe` and `dist/text4win-<version>-arm64.exe`
+and `dist/SHA256SUMS`, commits and pushes the version bump and creates the
+GitHub release with those four files. wixl cannot build an arm64 MSI, so
+arm64 is only a portable exe. Besides the build tools above it needs the
+GitHub CLI (`gh`). The installer is defined in
 `installer/text4win.wxs`.
 
 ## Layout

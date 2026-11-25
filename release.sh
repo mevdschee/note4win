@@ -16,10 +16,11 @@
 # goes up on every release as well.
 #
 # The script builds dist/text4win-<version>-amd64.msi, the portable
-# dist/text4win-<version>-amd64.exe (the same exe the MSI installs) and
-# dist/SHA256SUMS, commits and pushes the version bump and creates the GitHub
-# release v<version> with those three files. With
-# "msi" it stops after building: nothing is changed, committed or published,
+# dist/text4win-<version>-amd64.exe (the same exe the MSI installs), the
+# portable dist/text4win-<version>-arm64.exe (wixl cannot build an arm64 MSI;
+# Windows 11 on ARM runs the amd64 one emulated) and dist/SHA256SUMS, commits
+# and pushes the version bump and creates the GitHub release v<version> with
+# those four files. With "msi" it stops after building: nothing is changed, committed or published,
 # which is for trying the installer.
 set -e
 cd "$(dirname "$0")"
@@ -58,11 +59,13 @@ fi
 
 # Build the exe: icon, manifest and version info (cmd/text4win/rsrc_windows_amd64.syso,
 # not committed) and the version, which the About window shows.
-~/go/bin/go-winres make --arch amd64 --out cmd/text4win/rsrc
+~/go/bin/go-winres make --arch amd64,arm64 --out cmd/text4win/rsrc
 go test ./...
 GOOS=windows go vet ./...
 rm -rf dist && mkdir dist
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o dist/text4win.exe ./cmd/text4win
+arm=dist/text4win-$version-arm64.exe
+GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-H windowsgui -s -w -X main.version=$version" -o $arm ./cmd/text4win
 
 # Build the MSI.
 msi=dist/text4win-$version-amd64.msi
@@ -83,15 +86,15 @@ rm dist/seq.idt
 # The exe must be versioned in the File table, see installer/text4win.wxs.
 msiinfo export $msi File | grep -q $'\t'"$version.$revision"$'\t'
 
-# The portable exe and the checksums.
+# The portable amd64 exe and the checksums.
 exe=dist/text4win-$version-amd64.exe
 cp dist/text4win.exe $exe
-(cd dist && sha256sum "$(basename $msi)" "$(basename $exe)" >SHA256SUMS)
-ls -l $msi $exe
+(cd dist && sha256sum "$(basename $msi)" "$(basename $exe)" "$(basename $arm)" >SHA256SUMS)
+ls -l $msi $exe $arm
 cat dist/SHA256SUMS
 [ $part != msi ] || exit 0
 
 # Commit, push and publish.
 git commit -q -m "Release v$version" $json
 git push
-gh release create v$version --title v$version $msi $exe dist/SHA256SUMS
+gh release create v$version --title v$version $msi $exe $arm dist/SHA256SUMS
