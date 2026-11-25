@@ -107,6 +107,7 @@ type Editor struct {
 	memDC    uintptr
 	memBmp   uintptr
 	memW     int32
+	memH     int32
 	oldBmp   uintptr
 	cw, ch   int32 // client size
 	hasFocus bool
@@ -715,12 +716,12 @@ func (e *Editor) paint() {
 	if e.font == 0 || e.cw <= 0 {
 		return
 	}
-	if e.memBmp == 0 || e.memW < e.cw {
+	if e.memBmp == 0 || e.memW < e.cw || e.memH != e.lineH {
 		if e.memBmp != 0 {
 			procSelectObject.Call(e.memDC, e.oldBmp)
 			deleteObject(e.memBmp)
 		}
-		e.memW = e.cw + 64
+		e.memW, e.memH = max(e.memW, e.cw+64), e.lineH
 		e.memBmp, _, _ = procCreateCompatibleBitmap.Call(hdc, uintptr(e.memW), uintptr(e.lineH))
 		e.oldBmp, _, _ = procSelectObject.Call(e.memDC, e.memBmp)
 	}
