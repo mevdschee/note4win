@@ -13,7 +13,7 @@
 #
 #   CERTUM_MODULE  PKCS#11 library of SimplySign Desktop (searched in /opt)
 #   CERTUM_CERT    signing certificate followed by the intermediate CA, PEM
-#                  (default ~/.config/note4win/codesign.pem)
+#                  (default ~/.config/certum/codesign.pem)
 #   CERTUM_ALIAS   alias of the key, when SimplySign has more than one
 #   CERTUM_PIN     PKCS#11 PIN, if SimplySign asks for one
 #
@@ -52,7 +52,7 @@ fi
 
 # Code signing, required for a release, optional for "msi".
 module=${CERTUM_MODULE:-$(find /opt -iname 'SimplySignPKCS*.so' 2>/dev/null | head -1)}
-cert=${CERTUM_CERT:-$HOME/.config/note4win/codesign.pem}
+cert=${CERTUM_CERT:-$HOME/.config/certum/codesign.pem}
 signing=1
 if [ ! -f "$module" ] || [ ! -f "$cert" ] || ! command -v jsign >/dev/null; then
 	[ $part = msi ] || {
