@@ -207,14 +207,14 @@ The icon is `winres/icon.svg`. After changing it, run `go run ./tools/genicon`
 `winres/winres.json` (`file_version`, as `major.minor.build.revision`; the
 revision goes up on every release), runs the tests, builds
 `dist/note4win-<version>-amd64.msi`, the portable
-`dist/note4win-<version>-amd64.exe` and `dist/note4win-<version>-arm64.exe`
-and `dist/SHA256SUMS`, commits and pushes the version bump and creates the
-GitHub release with those four files. wixl cannot build an arm64 MSI, so arm64
-is only a portable exe. Besides the build tools above it needs the GitHub CLI
-(`gh`). The installer is defined in `installer/note4win.wxs`. `release.sh`
-signs the exes and the MSI with jsign and the Certum certificate in
-SimplySign; start SimplySign Desktop and connect it first. The settings are at
-its top.
+`dist/note4win-<version>-amd64.exe` and `dist/note4win-<version>-arm64.exe` and
+`dist/SHA256SUMS`, commits and pushes the version bump and creates the GitHub
+release with those four files. wixl cannot build an arm64 MSI, so arm64 is only
+a portable exe. Besides the build tools above it needs the GitHub CLI (`gh`).
+The installer is defined in `installer/note4win.wxs`. `release.sh` signs the
+exes and the MSI with [ssctl](https://github.com/mevdschee/simplysign-go) and
+the Certum certificate in SimplySign; run `ssctl login` first and log in with a
+token from the SimplySign mobile app. SimplySign Desktop is not needed.
 
 ## Layout
 
